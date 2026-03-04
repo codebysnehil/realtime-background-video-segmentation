@@ -1,2396 +1,2541 @@
-// "use client";
-
-// import React, { useRef, useEffect, useState, useCallback } from "react";
-// import {
-//   Camera,
-//   Upload,
-//   Settings,
-//   Download,
-//   Play,
-//   Square,
-//   Wifi,
-//   WifiOff,
-//   Activity,
-//   Cpu,
-//   Zap,
-//   Monitor,
-//   Cloud,
-//   Shield,
-//   Sparkles,
-//   BarChart3,
-//   Users,
-//   Star,
-//   Mic,
-//   MicOff,
-//   Volume2,
-//   VolumeX,
-//   RotateCcw,
-//   Maximize,
-//   Minimize,
-// } from "lucide-react";
-
-// // Enhanced type definitions
-// interface BackgroundSettings {
-//   type: "blur" | "office" | "nature" | "space" | "beach" | "custom" | "gradient" | "abstract";
-//   blurAmount: number;
-//   solidColor: string;
-//   selectedBackground: string | null;
-//   quality: "high" | "medium" | "low";
-//   edgeSmoothing: number;
-// }
-
-// interface StreamState {
-//   isStreaming: boolean;
-//   isProcessing: boolean;
-//   fps: number;
-//   latency: number;
-//   quality: "4K" | "HD" | "SD";
-//   bitrate: number;
-// }
-
-// interface ConnectionState {
-//   isConnected: boolean;
-//   isConnecting: boolean;
-//   reconnectCount: number;
-//   serverVersion: string;
-//   serverLoad: number;
-// }
-
-// interface PerformanceMetrics {
-//   cpuUsage: number;
-//   memoryUsage: number;
-//   networkLatency: number;
-//   frameDrops: number;
-//   totalFrames: number;
-//   uptime: number;
-// }
-
-// const Home: React.FC = () => {
-//   const videoRef = useRef<HTMLVideoElement>(null);
-//   const canvasRef = useRef<HTMLCanvasElement>(null);
-//   const fileInputRef = useRef<HTMLInputElement>(null);
-//   const wsRef = useRef<WebSocket | null>(null);
-//   const animationFrameRef = useRef<number>();
-//   const fpsCounterRef = useRef<{ lastTime: number; frameCount: number }>({
-//     lastTime: 0,
-//     frameCount: 0,
-//   });
-//   const latencyRef = useRef<number>(0);
-//   const processingRef = useRef<boolean>(false);
-
-//   const [streamState, setStreamState] = useState<StreamState>({
-//     isStreaming: false,
-//     isProcessing: false,
-//     fps: 0,
-//     latency: 0,
-//     quality: "HD",
-//     bitrate: 0,
-//   });
-
-//   const [connectionState, setConnectionState] = useState<ConnectionState>({
-//     isConnected: false,
-//     isConnecting: false,
-//     reconnectCount: 0,
-//     serverVersion: "v2.1.0",
-//     serverLoad: 0,
-//   });
-
-//   const [backgroundSettings, setBackgroundSettings] = useState<BackgroundSettings>({
-//     type: "blur",
-//     blurAmount: 15,
-//     solidColor: "#6366f1",
-//     selectedBackground: null,
-//     quality: "high",
-//     edgeSmoothing: 85,
-//   });
-
-//   const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics>({
-//     cpuUsage: 0,
-//     memoryUsage: 0,
-//     networkLatency: 0,
-//     frameDrops: 0,
-//     totalFrames: 0,
-//     uptime: 0,
-//   });
-
-//   const [logs, setLogs] = useState<string[]>([]);
-//   const [isFullscreen, setIsFullscreen] = useState(false);
-//   const [audioEnabled, setAudioEnabled] = useState(false);
-//   const [showAdvanced, setShowAdvanced] = useState(false);
-//   const [sessionStats, setSessionStats] = useState({ startTime: Date.now(), processedFrames: 0 });
-
-//   // Enhanced logging function with categories
-//   const addLog = useCallback((message: string, category: "info" | "error" | "success" | "warning" = "info") => {
-//     const timestamp = new Date().toLocaleTimeString();
-//     const emoji = { info: "ℹ️", error: "❌", success: "✅", warning: "⚠️" }[category];
-//     setLogs((prev) => [...prev.slice(-7), `${timestamp} ${emoji} ${message}`]);
-//     console.log(`[${category.toUpperCase()}] ${message}`);
-//   }, []);
-
-//   // Simulated performance monitoring
-//   useEffect(() => {
-//     const interval = setInterval(() => {
-//       setPerformanceMetrics(prev => ({
-//         ...prev,
-//         cpuUsage: Math.random() * 30 + 20,
-//         memoryUsage: Math.random() * 40 + 30,
-//         networkLatency: Math.random() * 20 + 10,
-//         uptime: Date.now() - sessionStats.startTime,
-//       }));
-      
-//       setConnectionState(prev => ({
-//         ...prev,
-//         serverLoad: Math.random() * 30 + 15,
-//       }));
-//     }, 2000);
-
-//     return () => clearInterval(interval);
-//   }, [sessionStats.startTime]);
-
-//   // Enhanced WebSocket connection with retry logic
-//   const connectWebSocket = useCallback(() => {
-//     if (wsRef.current?.readyState === WebSocket.OPEN) return;
-
-//     setConnectionState((prev) => ({ ...prev, isConnecting: true }));
-//     addLog("Establishing secure connection to AI inference engine...", "info");
-
-//     const ws = new WebSocket("ws://localhost:8000/ws");
-
-//     ws.onopen = () => {
-//       setConnectionState({
-//         isConnected: true,
-//         isConnecting: false,
-//         reconnectCount: 0,
-//         serverVersion: "v2.1.0",
-//         serverLoad: 0,
-//       });
-//       addLog("Connected to MediaPipe AI Engine", "success");
-//     };
-
-//     ws.onmessage = (event) => {
-//       try {
-//         const data = JSON.parse(event.data);
-//         handleWebSocketMessage(data);
-//       } catch (error) {
-//         addLog(`Message parsing failed: ${error}`, "error");
-//       }
-//     };
-
-//     ws.onclose = () => {
-//       setConnectionState((prev) => ({
-//         ...prev,
-//         isConnected: false,
-//         isConnecting: false,
-//       }));
-//       addLog("Connection to AI engine lost", "warning");
-
-//       if (streamState.isStreaming) {
-//         setTimeout(() => {
-//           setConnectionState((prev) => ({
-//             ...prev,
-//             reconnectCount: prev.reconnectCount + 1,
-//           }));
-//           connectWebSocket();
-//         }, 3000);
-//       }
-//     };
-
-//     ws.onerror = () => {
-//       addLog("Failed to connect to AI backend (localhost:8000)", "error");
-//       setConnectionState((prev) => ({
-//         ...prev,
-//         isConnected: false,
-//         isConnecting: false,
-//       }));
-//     };
-
-//     wsRef.current = ws;
-//   }, [addLog, streamState.isStreaming]);
-
-//   const handleWebSocketMessage = useCallback((data: any) => {
-//     console.log("Received WebSocket message:", data);
-//     switch (data.type) {
-//       case "processed_frame":
-//         if (canvasRef.current && data.data) {
-//           const img = new Image();
-//           img.onload = () => {
-//             const canvas = canvasRef.current;
-//             const ctx = canvas?.getContext("2d");
-//             if (ctx && canvas) {
-//               canvas.width = img.width;
-//               canvas.height = img.height;
-//               ctx.drawImage(img, 0, 0);
-//             }
-//             processingRef.current = false;
-
-//             setSessionStats(prev => ({
-//               ...prev,
-//               processedFrames: prev.processedFrames + 1
-//             }));
-
-//             if (data.timestamp) {
-//               const latency = Date.now() - data.timestamp;
-//               latencyRef.current = latency;
-//               setStreamState((prev) => ({ ...prev, latency }));
-//             }
-//           };
-//           img.src = `data:image/jpeg;base64,${data.data}`;
-//         }
-//         break;
-
-//       case "background_changed":
-//         addLog(`Background switched to: ${data.background}`, "success");
-//         break;
-
-//       case "error":
-//         addLog(`AI Engine Error: ${data.message}`, "error");
-//         break;
-
-//       case "performance_update":
-//         setPerformanceMetrics(prev => ({ ...prev, ...data.metrics }));
-//         break;
-//     }
-//   }, [addLog]);
-
-//   const sendFrameToBackend = useCallback(() => {
-//     if (
-//       !wsRef.current ||
-//       wsRef.current.readyState !== WebSocket.OPEN ||
-//       !videoRef.current ||
-//       processingRef.current
-//     ) return;
-
-//     const video = videoRef.current;
-//     if (video.readyState !== 4) return;
-
-//     try {
-//       const tempCanvas = document.createElement("canvas");
-//       tempCanvas.width = video.videoWidth;
-//       tempCanvas.height = video.videoHeight;
-//       const tempCtx = tempCanvas.getContext("2d");
-
-//       if (!tempCtx) return;
-
-//       tempCtx.drawImage(video, 0, 0);
-//       const frameData = tempCanvas.toDataURL("image/jpeg", backgroundSettings.quality === "high" ? 0.9 : 0.7);
-
-//       processingRef.current = true;
-//       const message = {
-//         type: "frame",
-//         data: frameData.split(',')[1],
-//         timestamp: Date.now(),
-//         settings: {
-//           background: backgroundSettings.type,
-//           quality: backgroundSettings.quality,
-//           edgeSmoothing: backgroundSettings.edgeSmoothing,
-//         }
-//       };
-
-//       wsRef.current.send(JSON.stringify(message));
-//     } catch (error) {
-//       addLog(`Frame processing error: ${error}`, "error");
-//       processingRef.current = false;
-//     }
-//   }, [addLog, backgroundSettings]);
-
-//   const startProcessingLoop = useCallback(() => {
-//     const loop = () => {
-//       if (streamState.isStreaming && connectionState.isConnected) {
-//         sendFrameToBackend();
-
-//         const now = performance.now();
-//         fpsCounterRef.current.frameCount++;
-//         if (now - fpsCounterRef.current.lastTime >= 1000) {
-//           const fps = Math.round(
-//             (fpsCounterRef.current.frameCount * 1000) /
-//               (now - fpsCounterRef.current.lastTime)
-//           );
-//           setStreamState((prev) => ({ ...prev, fps, bitrate: fps * 2.5 }));
-//           fpsCounterRef.current.lastTime = now;
-//           fpsCounterRef.current.frameCount = 0;
-//         }
-//       }
-
-//       if (streamState.isStreaming) {
-//         animationFrameRef.current = requestAnimationFrame(loop);
-//       }
-//     };
-//     loop();
-//   }, [streamState.isStreaming, connectionState.isConnected, sendFrameToBackend]);
-
-//   const startCamera = useCallback(async () => {
-//     try {
-//       addLog("Initializing high-definition camera stream...", "info");
-
-//       const constraints = {
-//         video: {
-//           width: streamState.quality === "4K" ? 3840 : streamState.quality === "HD" ? 1920 : 1280,
-//           height: streamState.quality === "4K" ? 2160 : streamState.quality === "HD" ? 1080 : 720,
-//           facingMode: "user",
-//           frameRate: 30,
-//         },
-//         audio: audioEnabled,
-//       };
-
-//       const stream = await navigator.mediaDevices.getUserMedia(constraints);
-
-//       if (videoRef.current) {
-//         videoRef.current.srcObject = stream;
-//         await videoRef.current.play();
-
-//         setStreamState((prev) => ({
-//           ...prev,
-//           isStreaming: true,
-//           isProcessing: true,
-//         }));
-
-//         // Clear canvas before starting new stream
-//         if (canvasRef.current) {
-//           const ctx = canvasRef.current.getContext("2d");
-//           if (ctx) {
-//             ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-//           }
-//         }
-
-//         connectWebSocket();
-//         fpsCounterRef.current = { lastTime: performance.now(), frameCount: 0 };
-//         setSessionStats({ startTime: Date.now(), processedFrames: 0 });
-        
-//         addLog(`${streamState.quality} stream started successfully`, "success");
-//       }
-//     } catch (error) {
-//       addLog(`Camera initialization failed: ${error}`, "error");
-//     }
-//   }, [addLog, connectWebSocket, streamState.quality, audioEnabled]);
-
-//   const stopCamera = useCallback(() => {
-//     addLog("Stopping camera stream...", "info");
-
-//     if (videoRef.current?.srcObject) {
-//       const stream = videoRef.current.srcObject as MediaStream;
-//       stream.getTracks().forEach((track) => track.stop());
-//       videoRef.current.srcObject = null;
-//     }
-
-//     if (animationFrameRef.current) {
-//       cancelAnimationFrame(animationFrameRef.current);
-//     }
-
-//     if (wsRef.current) {
-//       wsRef.current.close();
-//     }
-
-//     // Clear the canvas to remove the last processed frame
-//     if (canvasRef.current) {
-//       const ctx = canvasRef.current.getContext("2d");
-//       if (ctx) {
-//         ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-//       }
-//     }
-
-//     // Reset processing state
-//     processingRef.current = false;
-
-//     setStreamState({
-//       isStreaming: false,
-//       isProcessing: false,
-//       fps: 0,
-//       latency: 0,
-//       quality: streamState.quality,
-//       bitrate: 0,
-//     });
-
-//     // Reset session stats
-//     setSessionStats({ startTime: Date.now(), processedFrames: 0 });
-
-//     addLog("Stream terminated successfully", "success");
-//   }, [addLog, streamState.quality]);
-
-//   useEffect(() => {
-//     if (streamState.isStreaming && connectionState.isConnected) {
-//       startProcessingLoop();
-//     }
-
-//     return () => {
-//       if (animationFrameRef.current) {
-//         cancelAnimationFrame(animationFrameRef.current);
-//       }
-//     };
-//   }, [streamState.isStreaming, connectionState.isConnected, startProcessingLoop]);
-
-//   // Cleanup on component unmount
-//   useEffect(() => {
-//     return () => {
-//       // Stop camera if running
-//       if (videoRef.current?.srcObject) {
-//         const stream = videoRef.current.srcObject as MediaStream;
-//         stream.getTracks().forEach((track) => track.stop());
-//       }
-      
-//       // Close WebSocket
-//       if (wsRef.current) {
-//         wsRef.current.close();
-//       }
-      
-//       // Clear canvas
-//       if (canvasRef.current) {
-//         const ctx = canvasRef.current.getContext("2d");
-//         if (ctx) {
-//           ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-//         }
-//       }
-//     };
-//   }, []);
-
-//   const changeBackground = useCallback((backgroundType: string) => {
-//     if (wsRef.current?.readyState === WebSocket.OPEN) {
-//       const message = {
-//         type: "change_background",
-//         background: backgroundType,
-//         settings: {
-//           quality: backgroundSettings.quality,
-//           edgeSmoothing: backgroundSettings.edgeSmoothing,
-//         }
-//       };
-//       console.log("Sending background change message:", message);
-//       wsRef.current.send(JSON.stringify(message));
-//       addLog(`Switching to ${backgroundType} background`, "info");
-//     } else {
-//       console.log("WebSocket not connected. State:", wsRef.current?.readyState);
-//       addLog("WebSocket not connected - cannot change background", "error");
-//     }
-//   }, [addLog, backgroundSettings]);
-
-//   const handleBackgroundUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-//     const file = event.target.files?.[0];
-//     if (file) {
-//       try {
-//         addLog("Uploading custom background asset...", "info");
-        
-//         const formData = new FormData();
-//         formData.append('file', file);
-        
-//         const response = await fetch('http://localhost:8000/upload-background', {
-//           method: 'POST',
-//           body: formData,
-//         });
-        
-//         if (response.ok) {
-//           const result = await response.json();
-//           console.log("Upload response:", result);
-//           setBackgroundSettings((prev) => ({
-//             ...prev,
-//             selectedBackground: URL.createObjectURL(file),
-//             type: result.background_id,
-//           }));
-          
-//           changeBackground('custom');
-//           addLog("Custom background uploaded successfully", "success");
-//         } else {
-//           const result = await response.json();
-//           addLog(`Upload failed: ${result.error}`, "error");
-//         }
-//       } catch (error) {
-//         addLog(`Upload error: ${error}`, "error");
-//       }
-//     }
-//   };
-
-//   const downloadFrame = () => {
-//     if (canvasRef.current) {
-//       const link = document.createElement("a");
-//       link.download = `ai-studio-capture-${Date.now()}.png`;
-//       link.href = canvasRef.current.toDataURL("image/png", 1.0);
-//       link.click();
-//       addLog("High-resolution frame exported", "success");
-//     }
-//   };
-
-//   const resetCanvas = () => {
-//     if (canvasRef.current) {
-//       const ctx = canvasRef.current.getContext("2d");
-//       if (ctx) {
-//         ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-//         addLog("Canvas cleared", "info");
-//       }
-//     }
-//   };
-
-//   const toggleFullscreen = () => {
-//     setIsFullscreen(!isFullscreen);
-//     if (!isFullscreen) {
-//       document.documentElement.requestFullscreen?.();
-//     } else {
-//       document.exitFullscreen?.();
-//     }
-//   };
-
-//   const formatUptime = (ms: number) => {
-//     const seconds = Math.floor(ms / 1000);
-//     const minutes = Math.floor(seconds / 60);
-//     const hours = Math.floor(minutes / 60);
-//     return `${hours.toString().padStart(2, '0')}:${(minutes % 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
-//   };
-
-//   const backgroundPresets = [
-//     { id: "blur", name: "Professional Blur", icon: "🌫️", gradient: "from-slate-400 to-slate-600" },
-//     { id: "office", name: "Modern Office", icon: "🏢", gradient: "from-blue-400 to-blue-600" },
-//     { id: "nature", name: "Natural Studio", icon: "🌲", gradient: "from-green-400 to-green-600" },
-//     { id: "space", name: "Cosmic Theme", icon: "🚀", gradient: "from-purple-400 to-purple-600" },
-//     { id: "beach", name: "Coastal Vibes", icon: "🏖️", gradient: "from-cyan-400 to-cyan-600" },
-//     { id: "gradient", name: "AI Gradient", icon: "🎨", gradient: "from-pink-400 to-pink-600" },
-//     { id: "abstract", name: "Abstract Pro", icon: "✨", gradient: "from-indigo-400 to-indigo-600" },
-//     { id: "custom", name: "Custom Asset", icon: "📁", gradient: "from-gray-400 to-gray-600" },
-//   ];
-
-//   return (
-//     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white overflow-hidden">
-//       {/* Animated background elements */}
-//       <div className="fixed inset-0 opacity-10">
-//         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500 rounded-full blur-3xl animate-pulse"></div>
-//         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500 rounded-full blur-3xl animate-pulse delay-1000"></div>
-//       </div>
-
-//       <div className="relative z-10 p-6 max-w-[120rem] mx-auto">
-//         {/* Header */}
-//         <div className="mb-8">
-//           <div className="flex items-center justify-between mb-6">
-//             <div className="flex items-center space-x-4">
-//               <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-//                 <Sparkles className="w-6 h-6" />
-//               </div>
-//               <div>
-//                 <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-//                   AI Background Studio
-//                 </h1>
-//                 <p className="text-slate-400 text-lg">
-//                   Enterprise-grade real-time background replacement powered by MediaPipe AI
-//                 </p>
-//               </div>
-//             </div>
-            
-//             <div className="flex items-center space-x-4">
-//               {/* Connection Status Badge */}
-//               <div className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
-//                 connectionState.isConnected
-//                   ? "bg-green-500/20 text-green-400 border border-green-500/30"
-//                   : connectionState.isConnecting
-//                   ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
-//                   : "bg-red-500/20 text-red-400 border border-red-500/30"
-//               }`}>
-//                 {connectionState.isConnected ? (
-//                   <>
-//                     <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-//                     <Wifi className="w-4 h-4" />
-//                     <span>AI Engine Online</span>
-//                   </>
-//                 ) : connectionState.isConnecting ? (
-//                   <>
-//                     <div className="w-2 h-2 bg-yellow-400 rounded-full animate-ping"></div>
-//                     <span>Connecting...</span>
-//                   </>
-//                 ) : (
-//                   <>
-//                     <WifiOff className="w-4 h-4" />
-//                     <span>Offline</span>
-//                   </>
-//                 )}
-//               </div>
-
-//               {/* Quality Indicator */}
-//               {streamState.isStreaming && (
-//                 <div className="flex items-center space-x-3 text-sm">
-//                   <div className="flex items-center space-x-1 text-blue-400">
-//                     <Monitor className="w-4 h-4" />
-//                     <span>{streamState.quality}</span>
-//                   </div>
-//                   <div className="flex items-center space-x-1 text-green-400">
-//                     <Activity className="w-4 h-4" />
-//                     <span>{streamState.fps} FPS</span>
-//                   </div>
-//                   <div className="flex items-center space-x-1 text-purple-400">
-//                     <Zap className="w-4 h-4" />
-//                     <span>{streamState.latency}ms</span>
-//                   </div>
-//                 </div>
-//               )}
-//             </div>
-//           </div>
-//         </div>
-
-//         <div className="grid grid-cols-12 gap-8 h-[calc(100vh-12rem)]">
-//           {/* Main Video Feed */}
-//           <div className="col-span-8 space-y-6">
-//             <div className="bg-slate-800/50 backdrop-blur-xl rounded-2xl p-6 border border-slate-700/50 shadow-2xl h-full flex flex-col">
-//               <div className="flex items-center justify-between mb-6">
-//                 <div className="flex items-center space-x-3">
-//                   <div className={`w-3 h-3 rounded-full ${streamState.isStreaming ? 'bg-red-500 animate-pulse' : 'bg-slate-600'}`}></div>
-//                   <h2 className="text-xl font-semibold flex items-center space-x-2">
-//                     <Camera className="w-5 h-5 text-blue-400" />
-//                     <span>Live Studio Feed</span>
-//                   </h2>
-//                 </div>
-                
-//                 <div className="flex items-center space-x-2">
-//                   <button
-//                     onClick={() => setAudioEnabled(!audioEnabled)}
-//                     className={`p-2 rounded-lg transition-colors ${audioEnabled ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-700/50 text-slate-400'}`}
-//                   >
-//                     {audioEnabled ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-//                   </button>
-//                   <button
-//                     onClick={toggleFullscreen}
-//                     className="p-2 rounded-lg bg-slate-700/50 text-slate-400 hover:bg-slate-600/50 transition-colors"
-//                   >
-//                     {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-//                   </button>
-//                 </div>
-//               </div>
-
-//               <div className="relative flex-1 bg-black rounded-xl overflow-hidden group">
-//                 <video
-//                   ref={videoRef}
-//                   className="absolute inset-0 w-full h-full object-cover opacity-0"
-//                   autoPlay
-//                   muted={!audioEnabled}
-//                   playsInline
-//                 />
-
-//                 <canvas
-//                   ref={canvasRef}
-//                   className="w-full h-full object-cover transition-all duration-300"
-//                 />
-
-//                 {!streamState.isStreaming && (
-//                   <div className="absolute inset-0 flex items-center justify-center bg-slate-900/90 backdrop-blur-sm">
-//                     <div className="text-center space-y-4">
-//                       <div className="w-24 h-24 mx-auto bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center opacity-50">
-//                         <Camera className="w-12 h-12" />
-//                       </div>
-//                       <h3 className="text-xl font-semibold">AI Studio Ready</h3>
-//                       <p className="text-slate-400 max-w-md">
-//                         {!connectionState.isConnected
-//                           ? "Connect to AI backend to begin professional video processing"
-//                           : "Click Start to begin real-time AI background replacement"}
-//                       </p>
-//                       {connectionState.isConnected && (
-//                         <div className="mt-4 p-3 bg-green-500/20 border border-green-500/30 rounded-lg">
-//                           <div className="flex items-center space-x-2 text-green-400 text-sm">
-//                             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-//                             <span>AI Engine Connected - Ready to Start</span>
-//                           </div>
-//                         </div>
-//                       )}
-//                     </div>
-//                   </div>
-//                 )}
-
-//                 {/* Advanced Overlay */}
-//                 {streamState.isStreaming && (
-//                   <div className="absolute top-4 left-4 bg-black/80 backdrop-blur-sm rounded-xl p-4 text-xs space-y-2 opacity-0 group-hover:opacity-100 transition-opacity">
-//                     <div className="grid grid-cols-2 gap-4">
-//                       <div>
-//                         <div className="text-slate-400">Engine Status</div>
-//                         <div className="text-green-400 font-medium">Processing</div>
-//                       </div>
-//                       <div>
-//                         <div className="text-slate-400">Background</div>
-//                         <div className="text-blue-400 font-medium capitalize">{backgroundSettings.type}</div>
-//                       </div>
-//                       <div>
-//                         <div className="text-slate-400">Quality</div>
-//                         <div className="text-purple-400 font-medium">{backgroundSettings.quality.toUpperCase()}</div>
-//                       </div>
-//                       <div>
-//                         <div className="text-slate-400">Smoothing</div>
-//                         <div className="text-cyan-400 font-medium">{backgroundSettings.edgeSmoothing}%</div>
-//                       </div>
-//                     </div>
-//                     <div className="pt-2 border-t border-slate-700">
-//                       <div className="text-slate-400">Processed: {sessionStats.processedFrames} frames</div>
-//                     </div>
-//                   </div>
-//                 )}
-
-//                 {/* Performance HUD */}
-//                 {streamState.isStreaming && (
-//                   <div className="absolute top-4 right-4 bg-black/80 backdrop-blur-sm rounded-xl p-4 text-xs space-y-2 opacity-0 group-hover:opacity-100 transition-opacity">
-//                     <div className="text-slate-400 font-medium">Performance Metrics</div>
-//                     <div className="space-y-1">
-//                       <div className="flex justify-between">
-//                         <span className="text-slate-400">FPS:</span>
-//                         <span className="text-green-400 font-mono">{streamState.fps}</span>
-//                       </div>
-//                       <div className="flex justify-between">
-//                         <span className="text-slate-400">Latency:</span>
-//                         <span className="text-blue-400 font-mono">{streamState.latency}ms</span>
-//                       </div>
-//                       <div className="flex justify-between">
-//                         <span className="text-slate-400">Bitrate:</span>
-//                         <span className="text-purple-400 font-mono">{streamState.bitrate.toFixed(1)} Mbps</span>
-//                       </div>
-//                       <div className="flex justify-between">
-//                         <span className="text-slate-400">Uptime:</span>
-//                         <span className="text-cyan-400 font-mono">{formatUptime(performanceMetrics.uptime)}</span>
-//                       </div>
-//                     </div>
-//                   </div>
-//                 )}
-//               </div>
-
-//               {/* Enhanced Controls */}
-//               <div className="flex items-center justify-between mt-6">
-//                 <div className="flex items-center space-x-3">
-//                   {!streamState.isStreaming ? (
-//                     <button
-//                       onClick={startCamera}
-//                       disabled={connectionState.isConnecting}
-//                       className="flex items-center space-x-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:from-slate-600 disabled:to-slate-700 px-6 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 disabled:hover:scale-100 shadow-lg"
-//                     >
-//                       <Play className="w-5 h-5" />
-//                       <span>Start Studio</span>
-//                     </button>
-//                   ) : (
-//                     <button
-//                       onClick={stopCamera}
-//                       className="flex items-center space-x-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 px-6 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 shadow-lg"
-//                     >
-//                       <Square className="w-5 h-5" />
-//                       <span>Stop Studio</span>
-//                     </button>
-//                   )}
-
-//                   {!connectionState.isConnected && !connectionState.isConnecting && (
-//                     <button
-//                       onClick={connectWebSocket}
-//                       className="flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 px-6 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 shadow-lg"
-//                     >
-//                       <Cloud className="w-5 h-5" />
-//                       <span>Connect AI Engine</span>
-//                     </button>
-//                   )}
-//                 </div>
-
-//                 <div className="flex items-center space-x-3">
-//                   <select
-//                     value={streamState.quality}
-//                     onChange={(e) => setStreamState(prev => ({ ...prev, quality: e.target.value as any }))}
-//                     className="bg-slate-700/50 border border-slate-600 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-//                   >
-//                     <option value="4K">4K Ultra</option>
-//                     <option value="HD">HD 1080p</option>
-//                     <option value="SD">SD 720p</option>
-//                   </select>
-
-//                   <button
-//                     onClick={resetCanvas}
-//                     className="flex items-center space-x-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 px-6 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 shadow-lg"
-//                   >
-//                     <RotateCcw className="w-5 h-5" />
-//                     <span>Reset</span>
-//                   </button>
-
-//                   <button
-//                     onClick={downloadFrame}
-//                     disabled={!streamState.isStreaming}
-//                     className="flex items-center space-x-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 disabled:from-slate-600 disabled:to-slate-700 px-6 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 disabled:hover:scale-100 shadow-lg"
-//                   >
-//                     <Download className="w-5 h-5" />
-//                     <span>Export Frame</span>
-//                   </button>
-//                 </div>
-//               </div>
-//             </div>
-//           </div>
-
-//           {/* Right Sidebar */}
-//           <div className="col-span-4 space-y-6 overflow-y-auto">
-//             {/* Background Presets */}
-//             <div className="bg-slate-800/50 backdrop-blur-xl rounded-2xl p-6 border border-slate-700/50 shadow-2xl">
-//               <div className="flex items-center justify-between mb-6">
-//                 <h3 className="text-xl font-semibold flex items-center space-x-2">
-//                   <Sparkles className="w-5 h-5 text-purple-400" />
-//                   <span>AI Backgrounds</span>
-//                 </h3>
-//                 <div className="text-sm text-slate-400">
-//                   {backgroundPresets.length} presets
-//                 </div>
-//               </div>
-
-//               <div className="grid grid-cols-2 gap-3 mb-6">
-//                 {backgroundPresets.map((bg) => (
-//                   <button
-//                     key={bg.id}
-//                     onClick={() => {
-//                       setBackgroundSettings((prev) => ({
-//                         ...prev,
-//                         type: bg.id as any,
-//                       }));
-//                       changeBackground(bg.id);
-//                     }}
-//                     className={`group relative p-4 rounded-xl border-2 transition-all duration-300 transform hover:scale-105 ${
-//                       backgroundSettings.type === bg.id
-//                         ? "border-blue-400 bg-blue-500/20 shadow-lg shadow-blue-500/25"
-//                         : "border-slate-600 bg-slate-700/30 hover:border-slate-500"
-//                     }`}
-//                   >
-//                     <div className={`absolute inset-0 rounded-xl bg-gradient-to-br ${bg.gradient} opacity-10 group-hover:opacity-20 transition-opacity`}></div>
-//                     <div className="relative z-10 text-center">
-//                       <div className="text-2xl mb-2">{bg.icon}</div>
-//                       <div className="text-sm font-medium text-white">{bg.name}</div>
-//                     </div>
-//                     {backgroundSettings.type === bg.id && (
-//                       <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-//                         <Star className="w-3 h-3 text-white" />
-//                       </div>
-//                     )}
-//                   </button>
-//                 ))}
-//               </div>
-
-//               {/* Custom Upload */}
-//               {backgroundSettings.type === "custom" && (
-//                 <div className="mb-6">
-//                   <input
-//                     type="file"
-//                     ref={fileInputRef}
-//                     onChange={handleBackgroundUpload}
-//                     accept="image/*"
-//                     className="hidden"
-//                   />
-//                   <button
-//                     onClick={() => fileInputRef.current?.click()}
-//                     className="w-full flex items-center justify-center space-x-3 bg-gradient-to-r from-slate-700 to-slate-600 hover:from-slate-600 hover:to-slate-500 border-2 border-dashed border-slate-600 rounded-xl py-8 transition-all duration-300 group"
-//                   >
-//                     <Upload className="w-6 h-6 text-slate-400 group-hover:text-white transition-colors" />
-//                     <div>
-//                       <div className="text-white font-medium">Upload Custom Background</div>
-//                       <div className="text-slate-400 text-sm">PNG, JPG up to 10MB</div>
-//                     </div>
-//                   </button>
-//                   {backgroundSettings.selectedBackground && (
-//                     <div className="mt-3 p-3 bg-green-500/20 border border-green-500/30 rounded-lg">
-//                       <div className="flex items-center space-x-2 text-green-400 text-sm">
-//                         <Shield className="w-4 h-4" />
-//                         <span>Custom background loaded successfully</span>
-//                       </div>
-//                     </div>
-//                   )}
-//                 </div>
-//               )}
-
-//               {/* Advanced Settings */}
-//               <div className="space-y-4">
-//                 <button
-//                   onClick={() => setShowAdvanced(!showAdvanced)}
-//                   className="flex items-center justify-between w-full text-left text-sm font-medium text-slate-300 hover:text-white transition-colors"
-//                 >
-//                   <span>Advanced Settings</span>
-//                   <RotateCcw className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
-//                 </button>
-
-//                 {showAdvanced && (
-//                   <div className="space-y-4 animate-in slide-in-from-top-2 duration-200">
-//                     <div>
-//                       <label className="text-sm font-medium text-slate-300 block mb-2">
-//                         Processing Quality: {backgroundSettings.quality.toUpperCase()}
-//                       </label>
-//                       <select
-//                         value={backgroundSettings.quality}
-//                         onChange={(e) => setBackgroundSettings(prev => ({ 
-//                           ...prev, 
-//                           quality: e.target.value as "high" | "medium" | "low" 
-//                         }))}
-//                         className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-//                       >
-//                         <option value="high">High Quality</option>
-//                         <option value="medium">Medium Quality</option>
-//                         <option value="low">Low Quality</option>
-//                       </select>
-//                     </div>
-
-//                     <div>
-//                       <label className="text-sm font-medium text-slate-300 block mb-2">
-//                         Edge Smoothing: {backgroundSettings.edgeSmoothing}%
-//                       </label>
-//                       <input
-//                         type="range"
-//                         min="0"
-//                         max="100"
-//                         value={backgroundSettings.edgeSmoothing}
-//                         onChange={(e) => setBackgroundSettings(prev => ({ 
-//                           ...prev, 
-//                           edgeSmoothing: parseInt(e.target.value) 
-//                         }))}
-//                         className="w-full accent-blue-500"
-//                       />
-//                       <div className="flex justify-between text-xs text-slate-500 mt-1">
-//                         <span>Sharp</span>
-//                         <span>Smooth</span>
-//                       </div>
-//                     </div>
-
-//                     {backgroundSettings.type === "blur" && (
-//                       <div>
-//                         <label className="text-sm font-medium text-slate-300 block mb-2">
-//                           Blur Intensity: {backgroundSettings.blurAmount}px
-//                         </label>
-//                         <input
-//                           type="range"
-//                           min="5"
-//                           max="50"
-//                           value={backgroundSettings.blurAmount}
-//                           onChange={(e) => setBackgroundSettings(prev => ({ 
-//                             ...prev, 
-//                             blurAmount: parseInt(e.target.value) 
-//                           }))}
-//                           className="w-full accent-purple-500"
-//                         />
-//                       </div>
-//                     )}
-//                   </div>
-//                 )}
-//               </div>
-//             </div>
-
-//             {/* Performance Dashboard */}
-//             <div className="bg-slate-800/50 backdrop-blur-xl rounded-2xl p-6 border border-slate-700/50 shadow-2xl">
-//               <h3 className="text-xl font-semibold flex items-center space-x-2 mb-6">
-//                 <BarChart3 className="w-5 h-5 text-green-400" />
-//                 <span>Performance Monitor</span>
-//               </h3>
-
-//               <div className="space-y-4">
-//                 <div className="grid grid-cols-2 gap-4">
-//                   <div className="bg-slate-700/30 rounded-lg p-3">
-//                     <div className="flex items-center space-x-2 mb-2">
-//                       <Cpu className="w-4 h-4 text-blue-400" />
-//                       <span className="text-sm font-medium text-slate-300">CPU Usage</span>
-//                     </div>
-//                     <div className="text-2xl font-bold text-white">
-//                       {performanceMetrics.cpuUsage.toFixed(1)}%
-//                     </div>
-//                     <div className="w-full bg-slate-600 rounded-full h-2 mt-2">
-//                       <div 
-//                         className="bg-blue-400 h-2 rounded-full transition-all duration-300"
-//                         style={{ width: `${performanceMetrics.cpuUsage}%` }}
-//                       ></div>
-//                     </div>
-//                   </div>
-
-//                   <div className="bg-slate-700/30 rounded-lg p-3">
-//                     <div className="flex items-center space-x-2 mb-2">
-//                       <Activity className="w-4 h-4 text-green-400" />
-//                       <span className="text-sm font-medium text-slate-300">Memory</span>
-//                     </div>
-//                     <div className="text-2xl font-bold text-white">
-//                       {performanceMetrics.memoryUsage.toFixed(1)}%
-//                     </div>
-//                     <div className="w-full bg-slate-600 rounded-full h-2 mt-2">
-//                       <div 
-//                         className="bg-green-400 h-2 rounded-full transition-all duration-300"
-//                         style={{ width: `${performanceMetrics.memoryUsage}%` }}
-//                       ></div>
-//                     </div>
-//                   </div>
-//                 </div>
-
-//                 <div className="bg-slate-700/30 rounded-lg p-4">
-//                   <div className="flex items-center justify-between mb-3">
-//                     <span className="text-sm font-medium text-slate-300">AI Engine Status</span>
-//                     <div className={`w-3 h-3 rounded-full ${
-//                       connectionState.isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'
-//                     }`}></div>
-//                   </div>
-//                   <div className="space-y-2 text-sm">
-//                     <div className="flex justify-between">
-//                       <span className="text-slate-400">Version:</span>
-//                       <span className="text-blue-400 font-mono">{connectionState.serverVersion}</span>
-//                     </div>
-//                     <div className="flex justify-between">
-//                       <span className="text-slate-400">Server Load:</span>
-//                       <span className="text-purple-400">{connectionState.serverLoad.toFixed(1)}%</span>
-//                     </div>
-//                     <div className="flex justify-between">
-//                       <span className="text-slate-400">Uptime:</span>
-//                       <span className="text-cyan-400 font-mono">{formatUptime(performanceMetrics.uptime)}</span>
-//                     </div>
-//                     {connectionState.reconnectCount > 0 && (
-//                       <div className="flex justify-between">
-//                         <span className="text-slate-400">Reconnects:</span>
-//                         <span className="text-yellow-400">{connectionState.reconnectCount}</span>
-//                       </div>
-//                     )}
-//                   </div>
-//                 </div>
-
-//                 {streamState.isStreaming && (
-//                   <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg p-4 border border-blue-500/20">
-//                     <div className="flex items-center space-x-2 mb-3">
-//                       <Users className="w-4 h-4 text-blue-400" />
-//                       <span className="text-sm font-medium text-blue-300">Session Statistics</span>
-//                     </div>
-//                     <div className="grid grid-cols-2 gap-3 text-sm">
-//                       <div>
-//                         <span className="text-slate-400 block">Frames Processed</span>
-//                         <span className="text-white font-semibold">{sessionStats.processedFrames.toLocaleString()}</span>
-//                       </div>
-//                       <div>
-//                         <span className="text-slate-400 block">Session Duration</span>
-//                         <span className="text-white font-semibold">{formatUptime(Date.now() - sessionStats.startTime)}</span>
-//                       </div>
-//                     </div>
-//                   </div>
-//                 )}
-//               </div>
-//             </div>
-
-//             {/* Activity Log */}
-//             <div className="bg-slate-800/50 backdrop-blur-xl rounded-2xl p-6 border border-slate-700/50 shadow-2xl">
-//               <h3 className="text-xl font-semibold flex items-center space-x-2 mb-4">
-//                 <Activity className="w-5 h-5 text-orange-400" />
-//                 <span>System Activity</span>
-//               </h3>
-              
-//               <div className="space-y-2 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
-//                 {logs.length === 0 ? (
-//                   <div className="text-slate-500 text-sm italic text-center py-8">
-//                     No activity logged yet...
-//                   </div>
-//                 ) : (
-//                   logs.map((log, index) => (
-//                     <div 
-//                       key={index} 
-//                       className="text-sm font-mono text-slate-300 p-2 rounded-lg bg-slate-700/30 hover:bg-slate-700/50 transition-colors border-l-2 border-slate-600"
-//                     >
-//                       {log}
-//                     </div>
-//                   ))
-//                 )}
-//               </div>
-//             </div>
-//           </div>
-//         </div>
-
-//         {/* Setup Instructions (when disconnected) */}
-//         {!connectionState.isConnected && (
-//           <div className="mt-8 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-2xl p-8">
-//             Connect to AI for
-//           </div>
-//         )}
-
-//         {/* Footer */}
-//         <div className="text-center mt-12 pb-6">
-//           <div className="flex items-center justify-center space-x-8 text-sm text-slate-400 mb-4">
-//             <div className="flex items-center space-x-2">
-//               <Shield className="w-4 h-4 text-blue-400" />
-//               <span>Enterprise Security</span>
-//             </div>
-//             <div className="flex items-center space-x-2">
-//               <Zap className="w-4 h-4 text-purple-400" />
-//               <span>Real-time AI Processing</span>
-//             </div>
-//             <div className="flex items-center space-x-2">
-//               <Cloud className="w-4 h-4 text-green-400" />
-//               <span>Scalable Architecture</span>
-//             </div>
-//           </div>
-//           <p className="text-slate-500">
-//             Professional AI Background Studio • Powered by MediaPipe • Built for Enterprise
-//           </p>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default Home;
-
 "use client";
 
 import React, { useRef, useEffect, useState, useCallback } from "react";
-import {
-  Camera,
-  Upload,
-  Settings,
-  Download,
-  Play,
-  Square,
-  Wifi,
-  WifiOff,
-  Activity,
-  Cpu,
-  Zap,
-  Monitor,
-  Cloud,
-  Shield,
-  Sparkles,
-  BarChart3,
-  Users,
-  Star,
-  Mic,
-  MicOff,
-  Volume2,
-  VolumeX,
-  RotateCcw,
-  Maximize,
-  Minimize,
-  Crown,
-  Layers,
-  Eye,
-  Sliders,
-  Lock,
-  Unlock,
-  CreditCard,
-  Trophy,
-  Gem,
-  Zap as Lightning,
-  Timer,
-  TrendingUp,
-} from "lucide-react";
 
-// Enhanced type definitions
-interface BackgroundSettings {
-  type: "blur" | "office" | "nature" | "space" | "beach" | "custom" | "gradient" | "abstract" | "studio" | "urban" | "luxury" | "cosmic";
-  blurAmount: number;
-  solidColor: string;
-  selectedBackground: string | null;
-  quality: "ultra" | "high" | "medium";
-  edgeSmoothing: number;
-}
+// ─── Icons (inline SVG components for zero dependency) ───────────────────────
+const Icon = ({
+  d,
+  size = 20,
+  stroke = "currentColor",
+  fill = "none",
+  strokeWidth = 1.5,
+}) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill={fill}
+    stroke={stroke}
+    strokeWidth={strokeWidth}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    {Array.isArray(d) ? (
+      d.map((path, i) => <path key={i} d={path} />)
+    ) : (
+      <path d={d} />
+    )}
+  </svg>
+);
 
-interface StreamState {
-  isStreaming: boolean;
-  isProcessing: boolean;
-  fps: number;
-  latency: number;
-  quality: "4K" | "HD" | "SD";
-  bitrate: number;
-}
+const Icons = {
+  camera:
+    "M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
+  play: "M5 3l14 9-14 9V3z",
+  stop: "M6 6h12v12H6z",
+  wifi: [
+    "M5 12.55a11 11 0 0 1 14.08 0",
+    "M1.42 9a16 16 0 0 1 21.16 0",
+    "M8.53 16.11a6 6 0 0 1 6.95 0",
+    "M12 20h.01",
+  ],
+  wifiOff: [
+    "M1 1l22 22",
+    "M16.72 11.06A10.94 10.94 0 0 1 19 12.55",
+    "M5 12.55a10.94 10.94 0 0 1 5.17-2.39",
+    "M10.71 5.05A16 16 0 0 1 22.56 9",
+    "M1.42 9a15.91 15.91 0 0 1 4.7-2.88",
+    "M8.53 16.11a6 6 0 0 1 6.95 0",
+    "M12 20h.01",
+  ],
+  mic: [
+    "M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z",
+    "M19 10v2a7 7 0 0 1-14 0v-2",
+    "M12 19v4",
+    "M8 23h8",
+  ],
+  micOff: [
+    "M1 1l22 22",
+    "M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6",
+    "M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23",
+    "M12 19v4",
+    "M8 23h8",
+  ],
+  download: [
+    "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4",
+    "M7 10l5 5 5-5",
+    "M12 15V3",
+  ],
+  upload: [
+    "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4",
+    "M17 8l-5-5-5 5",
+    "M12 3v12",
+  ],
+  settings: [
+    "M12 20h9",
+    "M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z",
+  ],
+  maximize: [
+    "M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3",
+  ],
+  minimize:
+    "M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3",
+  activity: "M22 12h-4l-3 9L9 3l-3 9H2",
+  cpu: [
+    "M18 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z",
+    "M9 9h6v6H9z",
+    "M9 1v3",
+    "M15 1v3",
+    "M9 20v3",
+    "M15 20v3",
+    "M20 9h3",
+    "M20 14h3",
+    "M1 9h3",
+    "M1 14h3",
+  ],
+  zap: "M13 2L3 14h9l-1 8 10-12h-9l1-8z",
+  cloud: "M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z",
+  crown: "M12 2l3 7h5l-4 5 2 7-6-4-6 4 2-7-4-5h5z",
+  star: "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z",
+  gem: ["M12 2L2 7l10 13L22 7z", "M2 7h20", "M12 2l5 5H7z"],
+  layers: ["M12 2L2 7l10 5 10-5-10-5z", "M2 17l10 5 10-5", "M2 12l10 5 10-5"],
+  shield: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
+  video: [
+    "M23 7l-7 5 7 5V7z",
+    "M1 5h15a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H1a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z",
+  ],
+  rotate:
+    "M23 4v6h-6 M1 20v-6h6 M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15",
+  timer: ["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z", "M12 6v6l4 2"],
+  eye: [
+    "M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z",
+    "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
+  ],
+  chart: ["M18 20V10", "M12 20V4", "M6 20v-6"],
+  lock: [
+    "M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2z",
+    "M7 11V7a5 5 0 0 1 10 0v4",
+  ],
+  check: "M20 6L9 17l-5-5",
+  x: "M18 6L6 18M6 6l12 12",
+  trending: "M23 6l-9.5 9.5-5-5L1 18",
+  folder: [
+    "M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z",
+  ],
+  sparkles: [
+    "M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z",
+    "M5 17l.75 2.25L8 20l-2.25.75L5 23l-.75-2.25L2 20l2.25-.75z",
+    "M19 1l.75 2.25L22 4l-2.25.75L19 7l-.75-2.25L16 4l2.25-.75z",
+  ],
+};
 
-interface ConnectionState {
-  isConnected: boolean;
-  isConnecting: boolean;
-  reconnectCount: number;
-  serverVersion: string;
-  serverLoad: number;
-}
+const Ico = ({ name, size = 20, className = "" }) => {
+  const d = Icons[name];
+  if (!d) return null;
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      {Array.isArray(d) ? (
+        d.map((path, i) => <path key={i} d={path} />)
+      ) : (
+        <path d={d} />
+      )}
+    </svg>
+  );
+};
 
-interface PerformanceMetrics {
-  cpuUsage: number;
-  memoryUsage: number;
-  networkLatency: number;
-  frameDrops: number;
-  totalFrames: number;
-  uptime: number;
-}
+// ─── Data ─────────────────────────────────────────────────────────────────────
+const BACKGROUNDS = [
+  {
+    id: "blur",
+    label: "Cinematic Blur",
+    tag: "FREE",
+    color: "#2D3A4A",
+    accent: "#60A5FA",
+  },
+  {
+    id: "office",
+    label: "Executive Suite",
+    tag: "FREE",
+    color: "#1E2A1E",
+    accent: "#34D399",
+  },
+  {
+    id: "studio",
+    label: "Broadcast Stage",
+    tag: "PRO",
+    color: "#1A1025",
+    accent: "#A78BFA",
+  },
+  {
+    id: "luxury",
+    label: "Penthouse",
+    tag: "PRO",
+    color: "#2A1A0A",
+    accent: "#F59E0B",
+  },
+  {
+    id: "nature",
+    label: "Forest Studio",
+    tag: "FREE",
+    color: "#0A1F0A",
+    accent: "#6EE7B7",
+  },
+  {
+    id: "urban",
+    label: "City Skyline",
+    tag: "PRO",
+    color: "#0D0D1A",
+    accent: "#818CF8",
+  },
+  {
+    id: "cosmic",
+    label: "Deep Space",
+    tag: "PRO",
+    color: "#0A0A1E",
+    accent: "#C084FC",
+  },
+  {
+    id: "beach",
+    label: "Oceanfront",
+    tag: "FREE",
+    color: "#051520",
+    accent: "#38BDF8",
+  },
+  {
+    id: "gradient",
+    label: "Neon Gradient",
+    tag: "PRO",
+    color: "#1A0A1A",
+    accent: "#F472B6",
+  },
+  {
+    id: "abstract",
+    label: "Abstract Mesh",
+    tag: "PRO",
+    color: "#0A0F1A",
+    accent: "#FB923C",
+  },
+  {
+    id: "space",
+    label: "Retro Future",
+    tag: "PRO",
+    color: "#050A0A",
+    accent: "#2DD4BF",
+  },
+  {
+    id: "custom",
+    label: "Custom Upload",
+    tag: "PRO",
+    color: "#111111",
+    accent: "#94A3B8",
+  },
+];
 
-interface SubscriptionTier {
-  id: string;
-  name: string;
-  price: number;
-  features: string[];
-  maxResolution: string;
-  maxFrameRate: number;
-  customBackgrounds: number;
-  aiEnhancements: boolean;
-  priority: boolean;
-  gradient: string;
-  popular?: boolean;
-}
+const PLANS = [
+  {
+    id: "free",
+    name: "Creator",
+    price: 0,
+    period: "forever",
+    desc: "Start creating today",
+    features: [
+      "HD 1080p output",
+      "4 free environments",
+      "30 FPS processing",
+      "Community support",
+    ],
+    cta: "Get Started Free",
+    gradient: "linear-gradient(135deg, #374151, #1F2937)",
+    ring: "#4B5563",
+  },
+  {
+    id: "pro",
+    name: "Professional",
+    price: 249,
+    period: "month",
+    desc: "For serious creators",
+    features: [
+      "4K Ultra HD output",
+      "All 12 environments",
+      "60 FPS processing",
+      "Custom backgrounds",
+      "AI enhancement",
+      "Priority queue",
+      "Recording & export",
+    ],
+    cta: "Start Pro Trial",
+    gradient: "linear-gradient(135deg, #4F46E5, #7C3AED, #DB2777)",
+    ring: "#7C3AED",
+    badge: "MOST POPULAR",
+  },
+  {
+    id: "enterprise",
+    name: "Enterprise",
+    price: 999,
+    period: "month",
+    desc: "For studios & teams",
+    features: [
+      "8K cinematic output",
+      "Custom AI models",
+      "120 FPS ultra-smooth",
+      "White-label access",
+      "API integration",
+      "Dedicated support",
+      "Team workspaces",
+      "Analytics dashboard",
+    ],
+    cta: "Contact Sales",
+    gradient: "linear-gradient(135deg, #B45309, #D97706, #F59E0B)",
+    ring: "#D97706",
+  },
+];
 
-const Home: React.FC = () => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const animationFrameRef = useRef<number>();
-  const fpsCounterRef = useRef<{ lastTime: number; frameCount: number }>({
-    lastTime: 0,
-    frameCount: 0,
-  });
-  const latencyRef = useRef<number>(0);
-  const processingRef = useRef<boolean>(false);
+// ─── Main Component ───────────────────────────────────────────────────────────
+export default function VirtualStagePro() {
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const wsRef = useRef(null);
+  const animFrameRef = useRef(null);
+  const fpsRef = useRef({ last: 0, count: 0 });
+  const processingRef = useRef(false);
+  const recordTimerRef = useRef(null);
 
-  const [streamState, setStreamState] = useState<StreamState>({
-    isStreaming: false,
-    isProcessing: false,
-    fps: 0,
-    latency: 0,
-    quality: "HD",
-    bitrate: 0,
-  });
-
-  const [connectionState, setConnectionState] = useState<ConnectionState>({
-    isConnected: false,
-    isConnecting: false,
-    reconnectCount: 0,
-    serverVersion: "v3.2.0",
-    serverLoad: 0,
-  });
-
-  const [backgroundSettings, setBackgroundSettings] = useState<BackgroundSettings>({
-    type: "blur",
-    blurAmount: 15,
-    solidColor: "#6366f1",
-    selectedBackground: null,
-    quality: "ultra",
-    edgeSmoothing: 85,
-  });
-
-  const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics>({
-    cpuUsage: 0,
-    memoryUsage: 0,
-    networkLatency: 0,
-    frameDrops: 0,
-    totalFrames: 0,
-    uptime: 0,
-  });
-
-  const [logs, setLogs] = useState<string[]>([]);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [audioEnabled, setAudioEnabled] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [sessionStats, setSessionStats] = useState({ startTime: Date.now(), processedFrames: 0 });
-  const [showPricing, setShowPricing] = useState(false);
-  const [currentTier, setCurrentTier] = useState("free");
+  const [streaming, setStreaming] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [fps, setFps] = useState(0);
+  const [latency, setLatency] = useState(0);
+  const [quality, setQuality] = useState("HD");
+  const [bgType, setBgType] = useState("blur");
+  const [edgeSmooth, setEdgeSmooth] = useState(82);
+  const [processQuality, setProcessQuality] = useState("high");
+  const [audioOn, setAudioOn] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [logs, setLogs] = useState([]);
+  const [cpu, setCpu] = useState(0);
+  const [mem, setMem] = useState(0);
+  const [uptime, setUptime] = useState(0);
+  const [frames, setFrames] = useState(0);
+  const [sessionStart] = useState(Date.now());
+  const [plan, setPlan] = useState("free");
+  const [showPlans, setShowPlans] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState("");
+  const [recording, setRecording] = useState(false);
+  const [recTime, setRecTime] = useState(0);
+  const [recordings, setRecordings] = useState([]);
+  const [activeTab, setActiveTab] = useState("environments");
+  const [serverLoad, setServerLoad] = useState(0);
+  const [reconnects, setReconnects] = useState(0);
+  const [blurAmount, setBlurAmount] = useState(15);
 
-  // Subscription tiers for monetization
-  const subscriptionTiers: SubscriptionTier[] = [
-    {
-      id: "free",
-      name: "Free",
-      price: 0,
-      features: ["HD Resolution", "Basic Backgrounds", "5 Min Sessions", "Community Support"],
-      maxResolution: "HD",
-      maxFrameRate: 30,
-      customBackgrounds: 3,
-      aiEnhancements: false,
-      priority: false,
-      gradient: "from-slate-400 to-slate-600",
-    },
-    {
-      id: "pro",
-      name: "Professional",
-      price: 249,
-      features: ["4K Resolution", "Premium Backgrounds", "Unlimited Sessions", "AI Enhancements", "Priority Processing"],
-      maxResolution: "4K",
-      maxFrameRate: 60,
-      customBackgrounds: 25,
-      aiEnhancements: true,
-      priority: true,
-      gradient: "from-blue-500 to-purple-600",
-      popular: true,
-    },
-    {
-      id: "enterprise",
-      name: "Enterprise",
-      price: 499,
-      features: ["8K Resolution", "Custom AI Models", "Unlimited Everything", "24/7 Support", "White Label", "API Access"],
-      maxResolution: "8K",
-      maxFrameRate: 120,
-      customBackgrounds: -1, // unlimited
-      aiEnhancements: true,
-      priority: true,
-      gradient: "from-amber-500 to-orange-600",
-    },
-  ];
+  // Sim metrics
+  useEffect(() => {
+    const t = setInterval(() => {
+      setCpu(22 + Math.random() * 28);
+      setMem(30 + Math.random() * 38);
+      setServerLoad(15 + Math.random() * 28);
+      setUptime(Date.now() - sessionStart);
+    }, 2000);
+    return () => clearInterval(t);
+  }, [sessionStart]);
 
-  // Enhanced logging function with categories
-  const addLog = useCallback((message: string, category: "info" | "error" | "success" | "warning" = "info") => {
-    const timestamp = new Date().toLocaleTimeString();
-    const emoji = { info: "💡", error: "🚫", success: "✨", warning: "⚡" }[category];
-    setLogs((prev) => [...prev.slice(-7), `${timestamp} ${emoji} ${message}`]);
-    console.log(`[${category.toUpperCase()}] ${message}`);
+  const log = useCallback((msg, type = "info") => {
+    const icons = { info: "›", error: "✕", success: "✓", warning: "!" };
+    const now = new Date().toLocaleTimeString("en", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    setLogs((p) => [
+      ...p.slice(-9),
+      { msg, type, time: now, icon: icons[type] },
+    ]);
   }, []);
 
-  // Check tier limits
-  const checkTierLimits = useCallback((action: string) => {
-    const tier = subscriptionTiers.find(t => t.id === currentTier);
-    if (!tier) return false;
-
-    if (action === "4k" && tier.maxResolution !== "4K" && tier.maxResolution !== "8K") {
-      setShowUpgrade(true);
-      addLog("4K resolution requires Pro subscription", "warning");
+  const requirePro = useCallback(
+    (feature) => {
+      if (plan === "free") {
+        setUpgradeFeature(feature);
+        setShowUpgrade(true);
+        return true;
+      }
       return false;
-    }
+    },
+    [plan],
+  );
 
-    if (action === "custom_bg" && tier.customBackgrounds !== -1 && backgroundSettings.type === "custom") {
-      // In a real app, you'd check how many custom backgrounds they've uploaded
-      setShowUpgrade(true);
-      addLog("Custom backgrounds limit reached", "warning");
-      return false;
-    }
-
-    return true;
-  }, [currentTier, backgroundSettings.type, addLog]);
-
-  // Simulated performance monitoring
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setPerformanceMetrics(prev => ({
-        ...prev,
-        cpuUsage: Math.random() * 30 + 20,
-        memoryUsage: Math.random() * 40 + 30,
-        networkLatency: Math.random() * 20 + 10,
-        uptime: Date.now() - sessionStats.startTime,
-      }));
-      
-      setConnectionState(prev => ({
-        ...prev,
-        serverLoad: Math.random() * 30 + 15,
-      }));
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [sessionStats.startTime]);
-
-  // Enhanced WebSocket connection with retry logic
-  const connectWebSocket = useCallback(() => {
+  const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
-
-    setConnectionState((prev) => ({ ...prev, isConnecting: true }));
-    addLog("Connecting to VirtualStage Engine...", "info");
+    setConnecting(true);
+    log("Connecting to VirtualStage engine...");
 
     const ws = new WebSocket("ws://localhost:8000/ws");
-
     ws.onopen = () => {
-      setConnectionState({
-        isConnected: true,
-        isConnecting: false,
-        reconnectCount: 0,
-        serverVersion: "v3.2.0",
-        serverLoad: 0,
-      });
-      addLog("VirtualStage Engine connected successfully", "success");
+      setConnected(true);
+      setConnecting(false);
+      setReconnects(0);
+      log("Engine online — ready to stream", "success");
     };
-
-    ws.onmessage = (event) => {
+    ws.onmessage = (e) => {
       try {
-        const data = JSON.parse(event.data);
-        handleWebSocketMessage(data);
-      } catch (error) {
-        addLog(`Message parsing failed: ${error}`, "error");
-      }
-    };
-
-    ws.onclose = () => {
-      setConnectionState((prev) => ({
-        ...prev,
-        isConnected: false,
-        isConnecting: false,
-      }));
-      addLog("Engine connection lost", "warning");
-
-      if (streamState.isStreaming) {
-        setTimeout(() => {
-          setConnectionState((prev) => ({
-            ...prev,
-            reconnectCount: prev.reconnectCount + 1,
-          }));
-          connectWebSocket();
-        }, 3000);
-      }
-    };
-
-    ws.onerror = () => {
-      addLog("Failed to connect to engine (localhost:8000)", "error");
-      setConnectionState((prev) => ({
-        ...prev,
-        isConnected: false,
-        isConnecting: false,
-      }));
-    };
-
-    wsRef.current = ws;
-  }, [addLog, streamState.isStreaming]);
-
-  const handleWebSocketMessage = useCallback((data: any) => {
-    console.log("Received WebSocket message:", data);
-    switch (data.type) {
-      case "processed_frame":
-        if (canvasRef.current && data.data) {
+        const d = JSON.parse(e.data);
+        if (d.type === "processed_frame" && canvasRef.current && d.data) {
           const img = new Image();
           img.onload = () => {
-            const canvas = canvasRef.current;
-            const ctx = canvas?.getContext("2d");
-            if (ctx && canvas) {
-              canvas.width = img.width;
-              canvas.height = img.height;
+            const cv = canvasRef.current;
+            const ctx = cv?.getContext("2d");
+            if (ctx && cv) {
+              cv.width = img.width;
+              cv.height = img.height;
               ctx.drawImage(img, 0, 0);
             }
             processingRef.current = false;
-
-            setSessionStats(prev => ({
-              ...prev,
-              processedFrames: prev.processedFrames + 1
-            }));
-
-            if (data.timestamp) {
-              const latency = Date.now() - data.timestamp;
-              latencyRef.current = latency;
-              setStreamState((prev) => ({ ...prev, latency }));
-            }
+            setFrames((p) => p + 1);
+            if (d.timestamp) setLatency(Date.now() - d.timestamp);
           };
-          img.src = `data:image/jpeg;base64,${data.data}`;
-        }
-        break;
+          img.src = `data:image/jpeg;base64,${d.data}`;
+        } else if (d.type === "error") log(d.message, "error");
+      } catch {}
+    };
+    ws.onclose = () => {
+      setConnected(false);
+      setConnecting(false);
+      log("Engine disconnected", "warning");
+    };
+    ws.onerror = () => {
+      setConnected(false);
+      setConnecting(false);
+      log("Connection failed — is backend running?", "error");
+    };
+    wsRef.current = ws;
+  }, [log]);
 
-      case "background_changed":
-        addLog(`Background switched to: ${data.background}`, "success");
-        break;
-
-      case "error":
-        addLog(`Engine Error: ${data.message}`, "error");
-        break;
-
-      case "performance_update":
-        setPerformanceMetrics(prev => ({ ...prev, ...data.metrics }));
-        break;
-    }
-  }, [addLog]);
-
-  const sendFrameToBackend = useCallback(() => {
+  const sendFrame = useCallback(() => {
     if (
       !wsRef.current ||
       wsRef.current.readyState !== WebSocket.OPEN ||
       !videoRef.current ||
       processingRef.current
-    ) return;
-
-    const video = videoRef.current;
-    if (video.readyState !== 4) return;
-
+    )
+      return;
+    const v = videoRef.current;
+    if (v.readyState !== 4) return;
     try {
-      const tempCanvas = document.createElement("canvas");
-      tempCanvas.width = video.videoWidth;
-      tempCanvas.height = video.videoHeight;
-      const tempCtx = tempCanvas.getContext("2d");
-
-      if (!tempCtx) return;
-
-      tempCtx.drawImage(video, 0, 0);
-      const frameData = tempCanvas.toDataURL("image/jpeg", backgroundSettings.quality === "ultra" ? 0.95 : backgroundSettings.quality === "high" ? 0.85 : 0.7);
-
+      const c = document.createElement("canvas");
+      c.width = v.videoWidth;
+      c.height = v.videoHeight;
+      const ctx = c.getContext("2d");
+      if (!ctx) return;
+      ctx.drawImage(v, 0, 0);
+      const q =
+        processQuality === "high"
+          ? 0.92
+          : processQuality === "medium"
+            ? 0.78
+            : 0.62;
+      const data = c.toDataURL("image/jpeg", q).split(",")[1];
       processingRef.current = true;
-      const message = {
-        type: "frame",
-        data: frameData.split(',')[1],
-        timestamp: Date.now(),
-        settings: {
-          background: backgroundSettings.type,
-          quality: backgroundSettings.quality,
-          edgeSmoothing: backgroundSettings.edgeSmoothing,
-          tier: currentTier,
-        }
-      };
-
-      wsRef.current.send(JSON.stringify(message));
-    } catch (error) {
-      addLog(`Frame processing error: ${error}`, "error");
+      wsRef.current.send(
+        JSON.stringify({
+          type: "frame",
+          data,
+          timestamp: Date.now(),
+          settings: {
+            background: bgType,
+            quality: processQuality,
+            edgeSmoothing: edgeSmooth,
+          },
+        }),
+      );
+    } catch {
       processingRef.current = false;
     }
-  }, [addLog, backgroundSettings, currentTier]);
+  }, [bgType, processQuality, edgeSmooth]);
 
-  const startProcessingLoop = useCallback(() => {
-    const loop = () => {
-      if (streamState.isStreaming && connectionState.isConnected) {
-        sendFrameToBackend();
-
-        const now = performance.now();
-        fpsCounterRef.current.frameCount++;
-        if (now - fpsCounterRef.current.lastTime >= 1000) {
-          const fps = Math.round(
-            (fpsCounterRef.current.frameCount * 1000) /
-              (now - fpsCounterRef.current.lastTime)
-          );
-          setStreamState((prev) => ({ ...prev, fps, bitrate: fps * 2.5 }));
-          fpsCounterRef.current.lastTime = now;
-          fpsCounterRef.current.frameCount = 0;
-        }
+  const loop = useCallback(() => {
+    if (streaming && connected) {
+      sendFrame();
+      const now = performance.now();
+      fpsRef.current.count++;
+      if (now - fpsRef.current.last >= 1000) {
+        setFps(
+          Math.round(
+            (fpsRef.current.count * 1000) / (now - fpsRef.current.last),
+          ),
+        );
+        fpsRef.current.last = now;
+        fpsRef.current.count = 0;
       }
+    }
+    if (streaming) animFrameRef.current = requestAnimationFrame(loop);
+  }, [streaming, connected, sendFrame]);
 
-      if (streamState.isStreaming) {
-        animationFrameRef.current = requestAnimationFrame(loop);
-      }
+  useEffect(() => {
+    if (streaming && connected) loop();
+    return () => {
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-    loop();
-  }, [streamState.isStreaming, connectionState.isConnected, sendFrameToBackend]);
+  }, [streaming, connected, loop]);
 
-  const startCamera = useCallback(async () => {
+  const startStream = useCallback(async () => {
     try {
-      addLog("Initializing professional camera stream...", "info");
-
-      // Check tier limits
-      if (streamState.quality === "4K" && !checkTierLimits("4k")) {
-        return;
-      }
-
-      const constraints = {
-        video: {
-          width: streamState.quality === "4K" ? 3840 : streamState.quality === "HD" ? 1920 : 1280,
-          height: streamState.quality === "4K" ? 2160 : streamState.quality === "HD" ? 1080 : 720,
-          facingMode: "user",
-          frameRate: 30,
-        },
-        audio: audioEnabled,
-      };
-
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-
+      log("Initializing camera stream...");
+      const w = quality === "4K" ? 3840 : quality === "HD" ? 1920 : 1280;
+      const h = quality === "4K" ? 2160 : quality === "HD" ? 1080 : 720;
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: w, height: h, facingMode: "user", frameRate: 30 },
+        audio: audioOn,
+      });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
-
-        setStreamState((prev) => ({
-          ...prev,
-          isStreaming: true,
-          isProcessing: true,
-        }));
-
-        if (canvasRef.current) {
-          const ctx = canvasRef.current.getContext("2d");
-          if (ctx) {
-            ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-          }
-        }
-
-        connectWebSocket();
-        fpsCounterRef.current = { lastTime: performance.now(), frameCount: 0 };
-        setSessionStats({ startTime: Date.now(), processedFrames: 0 });
-        
-        addLog(`${streamState.quality} stream started successfully`, "success");
+        setStreaming(true);
+        setFrames(0);
+        fpsRef.current = { last: performance.now(), count: 0 };
+        connect();
+        log(`${quality} stream active`, "success");
       }
-    } catch (error) {
-      addLog(`Camera initialization failed: ${error}`, "error");
+    } catch (e) {
+      log(`Camera failed: ${e}`, "error");
     }
-  }, [addLog, connectWebSocket, streamState.quality, audioEnabled, checkTierLimits]);
+  }, [quality, audioOn, connect, log]);
 
-  const stopCamera = useCallback(() => {
-    addLog("Stopping studio session...", "info");
-
+  const stopStream = useCallback(() => {
     if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach((track) => track.stop());
+      videoRef.current.srcObject.getTracks().forEach((t) => t.stop());
       videoRef.current.srcObject = null;
     }
-
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    if (wsRef.current) wsRef.current.close();
+    const cv = canvasRef.current;
+    if (cv) {
+      const ctx = cv.getContext("2d");
+      if (ctx) ctx.clearRect(0, 0, cv.width, cv.height);
     }
-
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
-
-    if (canvasRef.current) {
-      const ctx = canvasRef.current.getContext("2d");
-      if (ctx) {
-        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-      }
-    }
-
     processingRef.current = false;
-
-    setStreamState({
-      isStreaming: false,
-      isProcessing: false,
-      fps: 0,
-      latency: 0,
-      quality: streamState.quality,
-      bitrate: 0,
-    });
-
-    setSessionStats({ startTime: Date.now(), processedFrames: 0 });
-    addLog("Studio session ended successfully", "success");
-  }, [addLog, streamState.quality]);
-
-  useEffect(() => {
-    if (streamState.isStreaming && connectionState.isConnected) {
-      startProcessingLoop();
+    setStreaming(false);
+    setFps(0);
+    setLatency(0);
+    if (recording) {
+      setRecording(false);
+      if (recordTimerRef.current) clearInterval(recordTimerRef.current);
     }
+    log("Session ended", "success");
+  }, [recording, log]);
 
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, [streamState.isStreaming, connectionState.isConnected, startProcessingLoop]);
+  useEffect(
+    () => () => {
+      stopStream();
+    },
+    [],
+  );
 
-  useEffect(() => {
-    return () => {
-      if (videoRef.current?.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach((track) => track.stop());
+  const changeBg = useCallback(
+    (id) => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(
+          JSON.stringify({
+            type: "change_background",
+            background: id,
+            settings: { quality: processQuality, edgeSmoothing: edgeSmooth },
+          }),
+        );
+        log(`Environment → ${id}`, "info");
       }
-      
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-      
-      if (canvasRef.current) {
-        const ctx = canvasRef.current.getContext("2d");
-        if (ctx) {
-          ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-        }
-      }
-    };
-  }, []);
+    },
+    [processQuality, edgeSmooth, log],
+  );
 
-  const changeBackground = useCallback((backgroundType: string) => {
+  const selectBg = useCallback(
+    (bg) => {
+      const isPro = bg.tag === "PRO";
+      if (isPro && plan === "free") {
+        requirePro(bg.label);
+        return;
+      }
+      if (bg.id === "custom") {
+        fileInputRef.current?.click();
+        return;
+      }
+      setBgType(bg.id);
+      changeBg(bg.id);
+    },
+    [plan, requirePro, changeBg],
+  );
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    log("Uploading custom environment...");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("http://localhost:8000/upload-background", {
+        method: "POST",
+        body: fd,
+      });
+      if (res.ok) {
+        const d = await res.json();
+        setBgType(d.background_id);
+        changeBg(d.background_id);
+        log("Custom environment loaded", "success");
+      } else log("Upload failed", "error");
+    } catch (e) {
+      log(`Upload error: ${e}`, "error");
+    }
+  };
+
+  const exportFrame = () => {
+    if (!canvasRef.current) return;
+    const a = document.createElement("a");
+    a.download = `virtualstage-${Date.now()}.png`;
+    a.href = canvasRef.current.toDataURL("image/png", 1.0);
+    a.click();
+    log("Frame exported", "success");
+  };
+
+  const startRec = useCallback(() => {
+    if (requirePro("Recording")) return;
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      const message = {
-        type: "change_background",
-        background: backgroundType,
-        settings: {
-          quality: backgroundSettings.quality,
-          edgeSmoothing: backgroundSettings.edgeSmoothing,
-        }
-      };
-      console.log("Sending background change message:", message);
-      wsRef.current.send(JSON.stringify(message));
-      addLog(`Switching to ${backgroundType} environment`, "info");
-    } else {
-      console.log("WebSocket not connected. State:", wsRef.current?.readyState);
-      addLog("Engine not connected - cannot change background", "error");
+      wsRef.current.send(
+        JSON.stringify({
+          type: "start_recording",
+          recording_id: `rec_${Date.now()}`,
+          fps: 30,
+        }),
+      );
+      setRecording(true);
+      setRecTime(0);
+      recordTimerRef.current = setInterval(
+        () => setRecTime((p) => p + 1),
+        1000,
+      );
+      log("Recording started", "success");
     }
-  }, [addLog, backgroundSettings]);
+  }, [requirePro, log]);
 
-  const handleCustomUpload = () => {
-    if (!checkTierLimits("custom_bg")) return;
-    fileInputRef.current?.click();
-  };
-
-  const handleBackgroundUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
+  const stopRec = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN)
+      wsRef.current.send(JSON.stringify({ type: "stop_recording" }));
+    setRecording(false);
+    if (recordTimerRef.current) {
+      clearInterval(recordTimerRef.current);
+      recordTimerRef.current = null;
+    }
+    log("Recording saved", "success");
+    setTimeout(async () => {
       try {
-        addLog("Processing custom environment asset...", "info");
-        
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        const response = await fetch('http://localhost:8000/upload-background', {
-          method: 'POST',
-          body: formData,
-        });
-        
-        if (response.ok) {
-          const result = await response.json();
-          console.log("Upload response:", result);
-          setBackgroundSettings((prev) => ({
-            ...prev,
-            selectedBackground: URL.createObjectURL(file),
-            type: result.background_id,
-          }));
-          
-          console.log("Calling changeBackground with:", result.background_id);
-          changeBackground(result.background_id);
-          addLog(`Custom environment uploaded: ${result.background_id}`, "success");
-        } else {
-          const result = await response.json();
-          addLog(`Upload failed: ${result.error}`, "error");
-        }
-      } catch (error) {
-        addLog(`Upload error: ${error}`, "error");
-      }
-    }
+        const r = await fetch("http://localhost:8000/recordings/list");
+        if (r.ok) setRecordings((await r.json()).recordings || []);
+      } catch {}
+    }, 800);
+  }, [log]);
+
+  const fmtTime = (ms) => {
+    const s = Math.floor(ms / 1000),
+      m = Math.floor(s / 60),
+      h = Math.floor(m / 60);
+    return `${String(h).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+  };
+  const fmtRec = (s) =>
+    `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+  const fmtSize = (b) => {
+    if (!b) return "—";
+    const i = Math.floor(Math.log(b) / Math.log(1024));
+    return (b / Math.pow(1024, i)).toFixed(1) + ["B", "KB", "MB", "GB"][i];
   };
 
-  const downloadFrame = () => {
-    if (canvasRef.current) {
-      const link = document.createElement("a");
-      link.download = `virtualstage-pro-${Date.now()}.png`;
-      link.href = canvasRef.current.toDataURL("image/png", 1.0);
-      link.click();
-      addLog("Ultra-high quality frame exported", "success");
-    }
-  };
+  const currentBg = BACKGROUNDS.find((b) => b.id === bgType) || BACKGROUNDS[0];
 
-  const resetCanvas = () => {
-    if (canvasRef.current) {
-      const ctx = canvasRef.current.getContext("2d");
-      if (ctx) {
-        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-        addLog("Canvas reset", "info");
-      }
-    }
-  };
-
-  const toggleFullscreen = () => {
-    setIsFullscreen(!isFullscreen);
-    if (!isFullscreen) {
-      document.documentElement.requestFullscreen?.();
-    } else {
-      document.exitFullscreen?.();
-    }
-  };
-
-  const formatUptime = (ms: number) => {
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    return `${hours.toString().padStart(2, '0')}:${(minutes % 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
-  };
-
-  const backgroundPresets = [
-    { id: "blur", name: "Professional", emoji: "🎯", gradient: "from-indigo-400 to-indigo-600", premium: false },
-    { id: "office", name: "Executive", emoji: "🏛️", gradient: "from-slate-400 to-slate-600", premium: false },
-    { id: "luxury", name: "Luxury", emoji: "💎", gradient: "from-amber-400 to-amber-600", premium: true },
-    { id: "studio", name: "Broadcast", emoji: "📺", gradient: "from-red-400 to-red-600", premium: true },
-    { id: "nature", name: "Natural", emoji: "🌿", gradient: "from-emerald-400 to-emerald-600", premium: false },
-    { id: "urban", name: "Urban", emoji: "🏙️", gradient: "from-zinc-400 to-zinc-600", premium: true },
-    { id: "cosmic", name: "Cosmic", emoji: "🌌", gradient: "from-purple-400 to-purple-600", premium: true },
-    { id: "gradient", name: "Dynamic", emoji: "🎨", gradient: "from-pink-400 to-pink-600", premium: false },
-    { id: "space", name: "Future", emoji: "🚀", gradient: "from-cyan-400 to-cyan-600", premium: true },
-    { id: "abstract", name: "Abstract", emoji: "✨", gradient: "from-violet-400 to-violet-600", premium: true },
-    { id: "beach", name: "Tropical", emoji: "🏝️", gradient: "from-blue-400 to-blue-600", premium: false },
-    { id: "custom", name: "Custom", emoji: "📁", gradient: "from-gray-400 to-gray-600", premium: true },
-  ];
-
-  const currentTierData = subscriptionTiers.find(t => t.id === currentTier);
-
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white overflow-hidden relative">
-      {/* Premium animated background */}
-      <div className="fixed inset-0 opacity-5">
-        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-blue-600/20 via-purple-600/20 to-pink-600/20"></div>
-        <div className="absolute top-1/3 left-1/4 w-96 h-96 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full blur-3xl animate-pulse opacity-30"></div>
-        <div className="absolute bottom-1/3 right-1/4 w-96 h-96 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full blur-3xl animate-pulse delay-1000 opacity-30"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full blur-3xl animate-pulse delay-2000 opacity-20"></div>
-      </div>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&family=Inter:wght@300;400;500&display=swap');
 
-      <div className="relative z-10 p-8 max-w-[140rem] mx-auto">
-        {/* Premium Header */}
-        <div className="mb-10">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center space-x-6">
-              <div className="relative">
-                <div className="w-16 h-16 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-2xl">
-                  <Crown className="w-8 h-8 text-white" />
-                </div>
-                <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
-                  <Sparkles className="w-3 h-3 text-white" />
-                </div>
-              </div>
-              <div>
-                <h1 className="text-5xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                  VirtualStage Pro
-                </h1>
-                <p className="text-slate-400 text-xl mt-2">
-                  Professional Virtual Environment Studio • Cinema-Grade Real-Time Processing
-                </p>
-              </div>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+          --bg: #080A0E;
+          --surface: #0D1117;
+          --surface2: #141922;
+          --surface3: #1C2432;
+          --border: rgba(255,255,255,0.06);
+          --border2: rgba(255,255,255,0.1);
+          --text: #F1F5F9;
+          --muted: #64748B;
+          --accent: #6366F1;
+          --accent2: #8B5CF6;
+          --green: #10B981;
+          --red: #F43F5E;
+          --amber: #F59E0B;
+          --cyan: #06B6D4;
+          --font-display: 'Syne', sans-serif;
+          --font-body: 'Inter', sans-serif;
+          --font-mono: 'JetBrains Mono', monospace;
+          --radius: 16px;
+          --radius-sm: 10px;
+          --glow: 0 0 40px rgba(99,102,241,0.15);
+        }
+
+        body { background: var(--bg); color: var(--text); font-family: var(--font-body); }
+
+        .app {
+          min-height: 100vh;
+          background: var(--bg);
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+
+        /* ── Noise overlay ── */
+        .app::before {
+          content: '';
+          position: fixed; inset: 0;
+          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+          opacity: 0.025;
+          pointer-events: none;
+          z-index: 0;
+        }
+
+        /* ── Ambient glow ── */
+        .ambient {
+          position: fixed; pointer-events: none; z-index: 0;
+        }
+        .ambient-1 {
+          top: -20%; left: 15%;
+          width: 600px; height: 600px;
+          background: radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%);
+          filter: blur(40px);
+        }
+        .ambient-2 {
+          bottom: -10%; right: 10%;
+          width: 500px; height: 500px;
+          background: radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%);
+          filter: blur(40px);
+        }
+
+        /* ── Header ── */
+        .header {
+          position: relative; z-index: 10;
+          padding: 18px 32px;
+          display: flex; align-items: center; justify-content: space-between;
+          border-bottom: 1px solid var(--border);
+          background: rgba(8,10,14,0.8);
+          backdrop-filter: blur(24px);
+        }
+
+        .logo {
+          display: flex; align-items: center; gap: 14px;
+        }
+
+        .logo-mark {
+          width: 42px; height: 42px;
+          background: linear-gradient(135deg, #4F46E5, #7C3AED);
+          border-radius: 12px;
+          display: flex; align-items: center; justify-content: center;
+          position: relative;
+          box-shadow: 0 0 24px rgba(99,102,241,0.4);
+        }
+
+        .logo-text {
+          display: flex; flex-direction: column; gap: 1px;
+        }
+
+        .logo-name {
+          font-family: var(--font-display);
+          font-size: 20px; font-weight: 800;
+          letter-spacing: -0.02em;
+          background: linear-gradient(90deg, #E2E8F0, #94A3B8);
+          -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+
+        .logo-sub {
+          font-family: var(--font-mono);
+          font-size: 10px; font-weight: 400; color: var(--muted);
+          letter-spacing: 0.1em; text-transform: uppercase;
+        }
+
+        .header-right {
+          display: flex; align-items: center; gap: 12px;
+        }
+
+        .status-pill {
+          display: flex; align-items: center; gap: 8px;
+          padding: 7px 14px;
+          border-radius: 100px;
+          font-size: 12px; font-weight: 500;
+          border: 1px solid;
+          font-family: var(--font-mono);
+          transition: all 0.3s;
+        }
+
+        .status-dot {
+          width: 7px; height: 7px; border-radius: 50%;
+        }
+
+        .status-online { background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.3); color: #34D399; }
+        .status-offline { background: rgba(244,63,94,0.1); border-color: rgba(244,63,94,0.3); color: #FB7185; }
+        .status-connecting { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.3); color: #FCD34D; }
+
+        .pulse { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        .ping { animation: ping 1.2s infinite; }
+        @keyframes ping { 0%{transform:scale(1);opacity:1} 100%{transform:scale(2);opacity:0} }
+
+        .plan-badge {
+          display: flex; align-items: center; gap: 8px;
+          padding: 7px 16px;
+          border-radius: 100px;
+          font-size: 12px; font-weight: 600;
+          font-family: var(--font-mono);
+          background: linear-gradient(135deg, rgba(79,70,229,0.2), rgba(124,58,237,0.2));
+          border: 1px solid rgba(139,92,246,0.3);
+          color: #A78BFA;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .plan-badge:hover { background: linear-gradient(135deg, rgba(79,70,229,0.35), rgba(124,58,237,0.35)); }
+
+        .metric-chip {
+          display: flex; align-items: center; gap: 6px;
+          padding: 6px 12px;
+          background: var(--surface2);
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          font-family: var(--font-mono);
+          font-size: 12px;
+          white-space: nowrap;
+        }
+
+        .btn {
+          display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+          padding: 10px 20px;
+          border-radius: var(--radius-sm);
+          font-size: 13px; font-weight: 600;
+          cursor: pointer; border: none; outline: none;
+          transition: all 0.2s; position: relative; overflow: hidden;
+          font-family: var(--font-body);
+          text-decoration: none;
+        }
+
+        .btn:active { transform: scale(0.97); }
+
+        .btn-ghost {
+          background: var(--surface2); color: var(--muted); border: 1px solid var(--border);
+        }
+        .btn-ghost:hover { background: var(--surface3); color: var(--text); border-color: var(--border2); }
+
+        .btn-icon {
+          width: 38px; height: 38px; padding: 0;
+          background: var(--surface2); border: 1px solid var(--border);
+          color: var(--muted); border-radius: var(--radius-sm);
+        }
+        .btn-icon:hover { background: var(--surface3); color: var(--text); }
+
+        .btn-primary {
+          background: linear-gradient(135deg, #4F46E5, #7C3AED);
+          color: white;
+          box-shadow: 0 4px 24px rgba(99,102,241,0.3);
+        }
+        .btn-primary:hover { box-shadow: 0 6px 32px rgba(99,102,241,0.5); transform: translateY(-1px); }
+
+        .btn-danger {
+          background: linear-gradient(135deg, #E11D48, #F43F5E);
+          color: white;
+          box-shadow: 0 4px 20px rgba(244,63,94,0.3);
+        }
+        .btn-danger:hover { box-shadow: 0 6px 28px rgba(244,63,94,0.5); }
+
+        .btn-green {
+          background: linear-gradient(135deg, #059669, #10B981);
+          color: white;
+          box-shadow: 0 4px 20px rgba(16,185,129,0.25);
+        }
+        .btn-green:hover { box-shadow: 0 6px 28px rgba(16,185,129,0.4); }
+
+        .btn-amber {
+          background: linear-gradient(135deg, #D97706, #F59E0B);
+          color: white;
+          box-shadow: 0 4px 20px rgba(245,158,11,0.25);
+        }
+
+        /* ── Layout ── */
+        .workspace {
+          position: relative; z-index: 1;
+          display: grid;
+          grid-template-columns: 1fr 380px;
+          gap: 20px;
+          padding: 20px 28px 24px;
+          flex: 1;
+          min-height: 0;
+          max-height: calc(100vh - 80px);
+        }
+
+        /* ── Studio panel ── */
+        .studio-panel {
+          display: flex; flex-direction: column; gap: 16px;
+        }
+
+        .canvas-wrap {
+          flex: 1;
+          background: #020408;
+          border-radius: 20px;
+          overflow: hidden;
+          position: relative;
+          border: 1px solid var(--border);
+          min-height: 0;
+        }
+
+        .canvas-inner {
+          width: 100%; height: 100%;
+          display: flex; flex-direction: column;
+          min-height: 400px;
+        }
+
+        .canvas-header {
+          position: absolute; top: 0; left: 0; right: 0; z-index: 5;
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 14px 18px;
+          background: linear-gradient(180deg, rgba(2,4,8,0.95) 0%, transparent 100%);
+        }
+
+        .canvas-title {
+          display: flex; align-items: center; gap: 10px;
+          font-family: var(--font-display);
+          font-size: 13px; font-weight: 600;
+          color: var(--muted);
+          letter-spacing: 0.05em; text-transform: uppercase;
+        }
+
+        .live-badge {
+          display: flex; align-items: center; gap: 6px;
+          padding: 4px 10px;
+          background: rgba(244,63,94,0.15);
+          border: 1px solid rgba(244,63,94,0.4);
+          border-radius: 100px;
+          font-family: var(--font-mono);
+          font-size: 10px; font-weight: 500; color: #FB7185;
+          letter-spacing: 0.1em;
+        }
+
+        video { display: none; }
+
+        canvas {
+          width: 100%; height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+
+        .canvas-idle {
+          position: absolute; inset: 0;
+          display: flex; align-items: center; justify-content: center;
+          flex-direction: column; gap: 24px;
+        }
+
+        .idle-icon {
+          width: 96px; height: 96px;
+          background: var(--surface2);
+          border: 1px solid var(--border2);
+          border-radius: 28px;
+          display: flex; align-items: center; justify-content: center;
+          color: var(--muted);
+        }
+
+        .idle-title {
+          font-family: var(--font-display);
+          font-size: 28px; font-weight: 700;
+          color: var(--text);
+          text-align: center;
+        }
+
+        .idle-sub {
+          font-size: 14px; color: var(--muted);
+          text-align: center; max-width: 300px; line-height: 1.6;
+        }
+
+        .conn-notice {
+          display: flex; align-items: center; gap: 10px;
+          padding: 12px 20px;
+          background: rgba(16,185,129,0.08);
+          border: 1px solid rgba(16,185,129,0.2);
+          border-radius: var(--radius-sm);
+          font-size: 13px; color: #34D399;
+        }
+
+        /* ── HUD overlays ── */
+        .hud-overlay {
+          position: absolute;
+          pointer-events: none;
+          opacity: 0;
+          transition: opacity 0.3s;
+        }
+        .canvas-wrap:hover .hud-overlay { opacity: 1; }
+
+        .hud-tl { top: 56px; left: 14px; }
+        .hud-tr { top: 56px; right: 14px; }
+
+        .hud-card {
+          background: rgba(8,10,14,0.88);
+          backdrop-filter: blur(16px);
+          border: 1px solid var(--border2);
+          border-radius: 12px;
+          padding: 12px 14px;
+          min-width: 160px;
+        }
+
+        .hud-row {
+          display: flex; justify-content: space-between; align-items: center;
+          gap: 16px;
+          font-family: var(--font-mono);
+          font-size: 11px;
+        }
+        .hud-label { color: var(--muted); }
+        .hud-val { font-weight: 500; }
+
+        /* ── Canvas footer ── */
+        .canvas-footer {
+          position: absolute; bottom: 0; left: 0; right: 0; z-index: 5;
+          padding: 12px 18px;
+          display: flex; align-items: center; justify-content: space-between;
+          background: linear-gradient(0deg, rgba(2,4,8,0.9) 0%, transparent 100%);
+        }
+
+        .env-tag {
+          display: flex; align-items: center; gap: 8px;
+          font-family: var(--font-mono);
+          font-size: 11px; color: var(--muted);
+          letter-spacing: 0.06em;
+        }
+
+        .env-dot {
+          width: 8px; height: 8px; border-radius: 50%;
+        }
+
+        /* ── Controls bar ── */
+        .controls-bar {
+          display: flex; align-items: center; gap: 10px;
+          padding: 16px 20px;
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          flex-wrap: wrap;
+        }
+
+        .controls-left { display: flex; align-items: center; gap: 10px; flex: 1; }
+        .controls-right { display: flex; align-items: center; gap: 8px; }
+
+        .quality-select {
+          background: var(--surface2);
+          border: 1px solid var(--border2);
+          border-radius: 8px;
+          color: var(--text);
+          font-family: var(--font-mono);
+          font-size: 12px;
+          padding: 8px 12px;
+          outline: none;
+          cursor: pointer;
+        }
+
+        .rec-indicator {
+          display: flex; align-items: center; gap: 8px;
+          padding: 8px 14px;
+          background: rgba(244,63,94,0.1);
+          border: 1px solid rgba(244,63,94,0.3);
+          border-radius: 8px;
+          font-family: var(--font-mono);
+          font-size: 12px; color: #FB7185;
+          animation: recPulse 2s infinite;
+        }
+        @keyframes recPulse { 0%,100%{border-color:rgba(244,63,94,0.3)} 50%{border-color:rgba(244,63,94,0.7)} }
+
+        /* ── Right panel ── */
+        .right-panel {
+          display: flex; flex-direction: column; gap: 12px;
+          overflow-y: auto;
+          max-height: calc(100vh - 110px);
+          padding-right: 2px;
+          scrollbar-width: thin;
+          scrollbar-color: var(--surface3) transparent;
+        }
+
+        .right-panel::-webkit-scrollbar { width: 4px; }
+        .right-panel::-webkit-scrollbar-track { background: transparent; }
+        .right-panel::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 4px; }
+
+        /* ── Panel card ── */
+        .panel-card {
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          overflow: hidden;
+        }
+
+        .panel-head {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 14px 18px;
+          border-bottom: 1px solid var(--border);
+        }
+
+        .panel-title {
+          display: flex; align-items: center; gap: 10px;
+          font-family: var(--font-display);
+          font-size: 13px; font-weight: 700;
+          letter-spacing: 0.03em; text-transform: uppercase;
+          color: var(--muted);
+        }
+
+        .panel-count {
+          font-family: var(--font-mono);
+          font-size: 10px; color: var(--muted);
+          background: var(--surface2);
+          padding: 2px 8px; border-radius: 100px;
+        }
+
+        .panel-body { padding: 14px; }
+
+        /* ── Tabs ── */
+        .tabs {
+          display: flex; gap: 4px;
+          padding: 4px;
+          background: var(--surface2);
+          border-radius: 10px;
+          margin-bottom: 14px;
+        }
+
+        .tab {
+          flex: 1;
+          padding: 7px 10px;
+          font-size: 11px; font-weight: 600;
+          text-transform: uppercase; letter-spacing: 0.06em;
+          font-family: var(--font-display);
+          border-radius: 7px;
+          border: none; cursor: pointer;
+          transition: all 0.2s;
+          background: transparent; color: var(--muted);
+        }
+
+        .tab.active {
+          background: var(--surface3);
+          color: var(--text);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        /* ── Environment grid ── */
+        .env-grid {
+          display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+        }
+
+        .env-card {
+          position: relative;
+          aspect-ratio: 4/3;
+          border-radius: 10px;
+          overflow: hidden;
+          cursor: pointer;
+          border: 1.5px solid transparent;
+          transition: all 0.2s;
+        }
+
+        .env-card:hover { transform: translateY(-2px); border-color: var(--border2); }
+        .env-card.active { border-color: currentColor; }
+        .env-card.locked { cursor: not-allowed; }
+
+        .env-bg {
+          position: absolute; inset: 0;
+          display: flex; align-items: center; justify-content: center;
+        }
+
+        .env-gradient {
+          position: absolute; inset: 0;
+          background: linear-gradient(135deg, var(--c1, #1a1a2e), var(--c2, #16213e));
+        }
+
+        .env-info {
+          position: absolute; bottom: 0; left: 0; right: 0;
+          padding: 8px 8px 7px;
+          background: linear-gradient(0deg, rgba(0,0,0,0.85) 0%, transparent 100%);
+        }
+
+        .env-label {
+          font-size: 9px; font-weight: 600;
+          font-family: var(--font-display);
+          text-transform: uppercase; letter-spacing: 0.06em;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        .env-badge {
+          position: absolute; top: 6px; right: 6px;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-family: var(--font-mono);
+          font-size: 8px; font-weight: 500;
+        }
+
+        .badge-free { background: rgba(16,185,129,0.2); color: #34D399; border: 1px solid rgba(16,185,129,0.3); }
+        .badge-pro { background: rgba(139,92,246,0.2); color: #A78BFA; border: 1px solid rgba(139,92,246,0.3); }
+
+        .env-lock {
+          position: absolute; inset: 0;
+          display: flex; align-items: center; justify-content: center;
+          background: rgba(8,10,14,0.65);
+          backdrop-filter: blur(2px);
+        }
+
+        .env-active-ring {
+          position: absolute; inset: -1px;
+          border-radius: 11px;
+          pointer-events: none;
+        }
+
+        /* ── Slider ── */
+        .slider-row {
+          margin-bottom: 14px;
+        }
+
+        .slider-label {
+          display: flex; justify-content: space-between;
+          font-size: 11px; margin-bottom: 8px;
+          font-family: var(--font-mono);
+        }
+
+        .slider-name { color: var(--muted); }
+        .slider-val { color: var(--text); font-weight: 500; }
+
+        input[type="range"] {
+          width: 100%; height: 4px;
+          background: var(--surface3);
+          border-radius: 4px;
+          outline: none; cursor: pointer;
+          -webkit-appearance: none;
+          accent-color: var(--accent);
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          width: 14px; height: 14px;
+          background: white;
+          border-radius: 50%;
+          cursor: pointer;
+          box-shadow: 0 0 8px rgba(99,102,241,0.6);
+        }
+
+        /* ── Quality buttons ── */
+        .quality-btns {
+          display: flex; gap: 6px; margin-bottom: 14px;
+        }
+
+        .q-btn {
+          flex: 1; padding: 8px 0;
+          background: var(--surface2); border: 1px solid var(--border);
+          border-radius: 8px; color: var(--muted);
+          font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+          cursor: pointer; transition: all 0.2s;
+          display: flex; align-items: center; justify-content: center; gap: 4px;
+        }
+
+        .q-btn.active { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.4); color: #818CF8; }
+        .q-btn:hover:not(.active) { background: var(--surface3); color: var(--text); }
+
+        /* ── Stats grid ── */
+        .stats-grid {
+          display: grid; grid-template-columns: 1fr 1fr;
+          gap: 8px;
+        }
+
+        .stat-card {
+          background: var(--surface2);
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          padding: 12px;
+        }
+
+        .stat-label {
+          font-size: 10px; color: var(--muted);
+          text-transform: uppercase; letter-spacing: 0.08em;
+          font-family: var(--font-mono);
+          margin-bottom: 6px;
+        }
+
+        .stat-val {
+          font-family: var(--font-mono);
+          font-size: 22px; font-weight: 300;
+          line-height: 1;
+        }
+
+        .stat-bar {
+          height: 2px; background: var(--surface3);
+          border-radius: 2px; margin-top: 8px; overflow: hidden;
+        }
+
+        .stat-fill { height: 100%; border-radius: 2px; transition: width 1s; }
+
+        /* ── Server card ── */
+        .server-card {
+          background: var(--surface2);
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          padding: 14px;
+          margin-top: 8px;
+        }
+
+        .server-row {
+          display: flex; justify-content: space-between; align-items: center;
+          padding: 5px 0;
+          font-size: 12px;
+          border-bottom: 1px solid var(--border);
+        }
+
+        .server-row:last-child { border-bottom: none; }
+        .server-key { color: var(--muted); font-family: var(--font-mono); }
+        .server-val { font-family: var(--font-mono); font-weight: 500; font-size: 11px; }
+
+        /* ── Logs ── */
+        .log-list {
+          display: flex; flex-direction: column; gap: 4px;
+          max-height: 180px; overflow-y: auto;
+          scrollbar-width: thin; scrollbar-color: var(--surface3) transparent;
+        }
+
+        .log-item {
+          display: flex; align-items: flex-start; gap: 8px;
+          padding: 7px 10px;
+          background: var(--surface2);
+          border-radius: 7px;
+          font-family: var(--font-mono); font-size: 10px;
+          line-height: 1.4;
+        }
+
+        .log-icon { font-size: 10px; margin-top: 1px; flex-shrink: 0; }
+        .log-info .log-icon { color: var(--muted); }
+        .log-success .log-icon { color: var(--green); }
+        .log-error .log-icon { color: var(--red); }
+        .log-warning .log-icon { color: var(--amber); }
+
+        .log-time { color: var(--muted); flex-shrink: 0; }
+        .log-msg { color: var(--text); opacity: 0.8; }
+
+        .log-empty {
+          text-align: center; padding: 28px 0;
+          color: var(--muted); font-size: 12px;
+        }
+
+        /* ── Recordings ── */
+        .rec-list {
+          display: flex; flex-direction: column; gap: 6px;
+          max-height: 200px; overflow-y: auto;
+        }
+
+        .rec-item {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 10px 12px;
+          background: var(--surface2);
+          border: 1px solid var(--border);
+          border-radius: 9px;
+        }
+
+        .rec-name { font-family: var(--font-mono); font-size: 11px; color: var(--text); }
+        .rec-meta { font-size: 10px; color: var(--muted); margin-top: 2px; }
+        .rec-actions { display: flex; gap: 4px; }
+
+        /* ── Pricing overlay ── */
+        .overlay {
+          position: fixed; inset: 0; z-index: 100;
+          background: rgba(2,4,8,0.88);
+          backdrop-filter: blur(20px);
+          display: flex; align-items: center; justify-content: center;
+          padding: 24px;
+        }
+
+        .modal {
+          background: var(--surface);
+          border: 1px solid var(--border2);
+          border-radius: 24px;
+          overflow: hidden;
+          width: 100%; max-width: 860px;
+          box-shadow: 0 32px 80px rgba(0,0,0,0.6), var(--glow);
+        }
+
+        .modal-head {
+          padding: 28px 32px 24px;
+          border-bottom: 1px solid var(--border);
+          display: flex; align-items: flex-start; justify-content: space-between;
+        }
+
+        .modal-title {
+          font-family: var(--font-display);
+          font-size: 30px; font-weight: 800;
+          letter-spacing: -0.02em;
+          background: linear-gradient(90deg, var(--text), var(--muted));
+          -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+
+        .modal-sub { font-size: 14px; color: var(--muted); margin-top: 6px; }
+
+        .plan-grid {
+          display: grid; grid-template-columns: repeat(3, 1fr);
+          gap: 16px;
+          padding: 24px 28px;
+        }
+
+        .plan-card {
+          border-radius: 16px;
+          border: 1.5px solid var(--border);
+          overflow: hidden;
+          position: relative;
+          transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .plan-card:hover { transform: translateY(-3px); }
+        .plan-card.popular { border-color: rgba(124,58,237,0.5); }
+
+        .popular-ribbon {
+          position: absolute; top: 0; left: 0; right: 0;
+          padding: 6px 0;
+          text-align: center;
+          font-family: var(--font-mono);
+          font-size: 10px; font-weight: 600; letter-spacing: 0.1em;
+          background: linear-gradient(90deg, #4F46E5, #7C3AED);
+          text-transform: uppercase;
+        }
+
+        .plan-header {
+          padding: 20px 20px 16px;
+          background: var(--surface2);
+          margin-top: 28px;
+        }
+
+        .plan-header.no-ribbon { margin-top: 0; }
+
+        .plan-name {
+          font-family: var(--font-display);
+          font-size: 17px; font-weight: 700;
+        }
+
+        .plan-desc { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+        .plan-price {
+          margin-top: 14px;
+          display: flex; align-items: baseline; gap: 4px;
+        }
+
+        .price-currency { font-size: 18px; color: var(--muted); font-weight: 600; margin-bottom: 4px; }
+        .price-num { font-family: var(--font-display); font-size: 44px; font-weight: 800; line-height: 1; }
+        .price-per { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+
+        .plan-features {
+          padding: 16px 20px;
+          display: flex; flex-direction: column; gap: 8px;
+        }
+
+        .plan-feat {
+          display: flex; align-items: center; gap: 10px;
+          font-size: 12px; color: var(--muted);
+        }
+
+        .feat-check {
+          width: 16px; height: 16px;
+          background: rgba(16,185,129,0.15);
+          border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          flex-shrink: 0; color: var(--green);
+        }
+
+        .plan-cta {
+          padding: 0 20px 20px;
+        }
+
+        /* ── Upgrade modal ── */
+        .upgrade-modal {
+          max-width: 440px;
+        }
+
+        .upgrade-icon {
+          width: 72px; height: 72px;
+          border-radius: 20px;
+          display: flex; align-items: center; justify-content: center;
+          background: linear-gradient(135deg, rgba(245,158,11,0.2), rgba(217,119,6,0.2));
+          border: 1px solid rgba(245,158,11,0.3);
+          color: var(--amber);
+          margin: 0 auto 20px;
+        }
+
+        .upgrade-body { padding: 32px; text-align: center; }
+        .upgrade-title { font-family: var(--font-display); font-size: 24px; font-weight: 800; margin-bottom: 10px; }
+        .upgrade-sub { font-size: 14px; color: var(--muted); line-height: 1.6; margin-bottom: 24px; }
+
+        .feature-list {
+          background: var(--surface2);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          padding: 16px;
+          text-align: left; margin-bottom: 24px;
+        }
+
+        .feature-list-title { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; font-family: var(--font-mono); }
+
+        .feature-item { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 4px 0; }
+        .feature-item::before { content: '→'; color: var(--accent); font-size: 12px; flex-shrink: 0; }
+
+        .btn-row { display: flex; gap: 10px; }
+        .btn-row .btn { flex: 1; justify-content: center; }
+
+        /* ── Divider ── */
+        .divider {
+          height: 1px; background: var(--border);
+          margin: 12px 0;
+        }
+
+        /* ── Section label ── */
+        .section-label {
+          font-size: 10px; color: var(--muted);
+          text-transform: uppercase; letter-spacing: 0.1em;
+          font-family: var(--font-mono);
+          margin-bottom: 10px; margin-top: 4px;
+        }
+
+        /* ── Connect CTA ── */
+        .connect-cta {
+          margin-top: 12px;
+          padding: 16px;
+          background: var(--surface2);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-sm);
+          display: flex; flex-direction: column; gap: 12px;
+        }
+
+        .connect-cta-text { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+        /* ── Session info ── */
+        .session-strip {
+          display: flex; align-items: center; gap: 20px;
+          padding: 12px 18px;
+          background: rgba(99,102,241,0.06);
+          border: 1px solid rgba(99,102,241,0.15);
+          border-radius: var(--radius-sm);
+        }
+
+        .session-item { display: flex; flex-direction: column; gap: 2px; }
+        .session-key { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; font-family: var(--font-mono); }
+        .session-val { font-family: var(--font-mono); font-size: 14px; font-weight: 500; color: #818CF8; }
+
+        /* ── Color swatch ── */
+        input[type="color"] {
+          width: 100%; height: 36px; border-radius: 8px;
+          border: 1px solid var(--border2); cursor: pointer;
+          background: transparent; padding: 2px;
+        }
+
+        /* Animations */
+        @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+        .fade-in { animation: fadeIn 0.3s ease; }
+
+        @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:none} }
+        .slide-up { animation: slideUp 0.4s cubic-bezier(0.16,1,0.3,1); }
+
+        /* Responsive */
+        @media (max-width: 1100px) {
+          .workspace { grid-template-columns: 1fr; }
+          .right-panel { display: grid; grid-template-columns: 1fr 1fr; max-height: none; }
+        }
+      `}</style>
+
+      <div className="app">
+        {/* Ambient */}
+        <div className="ambient ambient-1" />
+        <div className="ambient ambient-2" />
+
+        {/* Header */}
+        <header className="header">
+          <div className="logo">
+            <div className="logo-mark">
+              <Ico
+                name="layers"
+                size={22}
+                className=""
+                style={{ color: "white" }}
+              />
             </div>
-            
-            <div className="flex items-center space-x-6">
-              {/* Subscription Badge */}
-              <div className={`flex items-center space-x-3 px-6 py-3 rounded-2xl text-sm font-semibold transition-all duration-500 backdrop-blur-sm bg-gradient-to-r ${currentTierData?.gradient} shadow-xl`}>
-                {currentTier === "enterprise" ? <Crown className="w-5 h-5" /> : currentTier === "pro" ? <Gem className="w-5 h-5" /> : <Star className="w-5 h-5" />}
-                <span>{currentTierData?.name} Plan</span>
-                {currentTier === "free" && (
-                  <button
-                    onClick={() => setShowPricing(true)}
-                    className="ml-2 px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
-                  >
-                    Upgrade
-                  </button>
-                )}
-              </div>
+            <div className="logo-text">
+              <div className="logo-name">VirtualStage</div>
+              <div className="logo-sub">Professional Studio · v3.2.0</div>
+            </div>
+          </div>
 
-              {/* Premium Status Badge */}
-              <div className={`flex items-center space-x-3 px-6 py-3 rounded-2xl text-sm font-semibold transition-all duration-500 backdrop-blur-sm ${
-                connectionState.isConnected
-                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-lg shadow-emerald-500/20"
-                  : connectionState.isConnecting
-                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-lg shadow-amber-500/20"
-                  : "bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-lg shadow-rose-500/20"
-              }`}>
-                {connectionState.isConnected ? (
-                  <>
-                    <div className="w-3 h-3 bg-emerald-400 rounded-full animate-pulse shadow-lg shadow-emerald-400/50"></div>
-                    <Cloud className="w-5 h-5" />
-                    <span>Engine Online</span>
-                  </>
-                ) : connectionState.isConnecting ? (
-                  <>
-                    <div className="w-3 h-3 bg-amber-400 rounded-full animate-ping"></div>
-                    <span>Connecting...</span>
-                  </>
-                ) : (
-                  <>
-                    <WifiOff className="w-5 h-5" />
-                    <span>Offline</span>
-                  </>
-                )}
-              </div>
-
-              {/* Quality Metrics */}
-              {streamState.isStreaming && (
-                <div className="flex items-center space-x-6 text-sm bg-slate-800/60 backdrop-blur-xl rounded-2xl px-6 py-3 border border-slate-700/50">
-                  <div className="flex items-center space-x-2 text-indigo-400">
-                    <Monitor className="w-4 h-4" />
-                    <span className="font-semibold">{streamState.quality}</span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-emerald-400">
-                    <Activity className="w-4 h-4" />
-                    <span className="font-semibold">{streamState.fps} FPS</span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-purple-400">
-                    <Zap className="w-4 h-4" />
-                    <span className="font-semibold">{streamState.latency}ms</span>
-                  </div>
+          <div className="header-right">
+            {streaming && (
+              <>
+                <div className="metric-chip" style={{ color: "#34D399" }}>
+                  <Ico name="activity" size={12} />
+                  <span>{fps} FPS</span>
                 </div>
+                <div className="metric-chip" style={{ color: "#818CF8" }}>
+                  <Ico name="zap" size={12} />
+                  <span>{latency}ms</span>
+                </div>
+                <div className="metric-chip" style={{ color: "#38BDF8" }}>
+                  <Ico name="eye" size={12} />
+                  <span>{quality}</span>
+                </div>
+              </>
+            )}
+
+            <div
+              className={`status-pill ${connected ? "status-online" : connecting ? "status-connecting" : "status-offline"}`}
+            >
+              <div
+                className={`status-dot ${connected ? "pulse" : connecting ? "ping" : ""}`}
+                style={{
+                  background: connected
+                    ? "#34D399"
+                    : connecting
+                      ? "#FCD34D"
+                      : "#FB7185",
+                }}
+              />
+              <Ico name={connected ? "wifi" : "wifiOff"} size={13} />
+              <span>
+                {connected
+                  ? "Engine Online"
+                  : connecting
+                    ? "Connecting…"
+                    : "Offline"}
+              </span>
+            </div>
+
+            <div className="plan-badge" onClick={() => setShowPlans(true)}>
+              <Ico name="crown" size={13} />
+              <span>
+                {plan === "free"
+                  ? "Free Plan"
+                  : plan === "pro"
+                    ? "Pro"
+                    : "Enterprise"}
+              </span>
+              {plan === "free" && (
+                <span style={{ color: "#F59E0B", fontSize: 10 }}>
+                  ↑ Upgrade
+                </span>
               )}
             </div>
           </div>
-        </div>
+        </header>
 
-        <div className="grid grid-cols-12 gap-10 h-[calc(100vh-14rem)]">
-          {/* Enhanced Main Studio */}
-          <div className="col-span-8 space-y-8">
-            <div className="bg-slate-900/60 backdrop-blur-2xl rounded-3xl p-8 border border-slate-700/30 shadow-2xl h-full flex flex-col">
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center space-x-4">
-                  <div className={`w-4 h-4 rounded-full ${streamState.isStreaming ? 'bg-red-500 animate-pulse shadow-lg shadow-red-500/50' : 'bg-slate-600'}`}></div>
-                  <h2 className="text-2xl font-bold flex items-center space-x-3">
-                    <Eye className="w-6 h-6 text-indigo-400" />
-                    <span>Virtual Studio</span>
-                  </h2>
-                  {streamState.isStreaming && (
-                    <div className="flex items-center space-x-2 text-sm bg-red-500/20 text-red-300 px-3 py-1 rounded-full border border-red-500/30">
-                      <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
-                      <span className="font-medium">LIVE</span>
+        {/* Workspace */}
+        <div className="workspace">
+          {/* Studio */}
+          <div className="studio-panel">
+            {/* Canvas */}
+            <div className="canvas-wrap" style={{ flex: 1 }}>
+              <div className="canvas-header">
+                <div className="canvas-title">
+                  <Ico name="camera" size={14} />
+                  Virtual Studio
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {streaming && (
+                    <div className="live-badge">
+                      <div
+                        className="status-dot pulse"
+                        style={{ background: "#F43F5E" }}
+                      />
+                      LIVE
+                    </div>
+                  )}
+                  {recording && (
+                    <div
+                      className="live-badge"
+                      style={{
+                        background: "rgba(244,63,94,0.15)",
+                        borderColor: "rgba(244,63,94,0.5)",
+                      }}
+                    >
+                      <div
+                        className="status-dot pulse"
+                        style={{ background: "#F43F5E" }}
+                      />
+                      REC {fmtRec(recTime)}
+                    </div>
+                  )}
+                  <button
+                    className="btn-icon btn"
+                    onClick={() => setAudioOn(!audioOn)}
+                    title="Toggle audio"
+                    style={
+                      audioOn
+                        ? {
+                            background: "rgba(99,102,241,0.15)",
+                            borderColor: "rgba(99,102,241,0.4)",
+                            color: "#818CF8",
+                          }
+                        : {}
+                    }
+                  >
+                    <Ico name={audioOn ? "mic" : "micOff"} size={15} />
+                  </button>
+                  <button
+                    className="btn-icon btn"
+                    onClick={() => {
+                      setFullscreen(!fullscreen);
+                      if (!fullscreen)
+                        document.documentElement.requestFullscreen?.();
+                      else document.exitFullscreen?.();
+                    }}
+                  >
+                    <Ico
+                      name={fullscreen ? "minimize" : "maximize"}
+                      size={15}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Video / Canvas area */}
+              <div className="canvas-inner">
+                <video ref={videoRef} autoPlay muted={!audioOn} playsInline />
+                <canvas
+                  ref={canvasRef}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    display: streaming ? "block" : "none",
+                  }}
+                />
+
+                {!streaming && (
+                  <div className="canvas-idle">
+                    <div className="idle-icon">
+                      <Ico name="camera" size={44} />
+                    </div>
+                    <div>
+                      <div className="idle-title">Studio Ready</div>
+                      <div className="idle-sub">
+                        {connected
+                          ? "Click Start Studio to begin real-time AI background replacement"
+                          : "Connect to the VirtualStage engine to start processing"}
+                      </div>
+                    </div>
+                    {connected && (
+                      <div className="conn-notice">
+                        <div
+                          className="status-dot pulse"
+                          style={{ background: "#34D399" }}
+                        />
+                        <span>Engine connected — press Start</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* HUD overlays */}
+                {streaming && (
+                  <>
+                    <div className="hud-overlay hud-tl">
+                      <div className="hud-card">
+                        <div
+                          style={{
+                            fontSize: 9,
+                            color: "var(--muted)",
+                            marginBottom: 8,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.08em",
+                            fontFamily: "var(--font-mono)",
+                          }}
+                        >
+                          Active Environment
+                        </div>
+                        <div className="hud-row" style={{ marginBottom: 4 }}>
+                          <span className="hud-label">Scene:</span>
+                          <span
+                            className="hud-val"
+                            style={{ color: currentBg.accent }}
+                          >
+                            {currentBg.label}
+                          </span>
+                        </div>
+                        <div className="hud-row" style={{ marginBottom: 4 }}>
+                          <span className="hud-label">Quality:</span>
+                          <span
+                            className="hud-val"
+                            style={{ color: "#818CF8" }}
+                          >
+                            {processQuality.toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="hud-row">
+                          <span className="hud-label">Smoothing:</span>
+                          <span
+                            className="hud-val"
+                            style={{ color: "#38BDF8" }}
+                          >
+                            {edgeSmooth}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="hud-overlay hud-tr">
+                      <div className="hud-card">
+                        <div
+                          style={{
+                            fontSize: 9,
+                            color: "var(--muted)",
+                            marginBottom: 8,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.08em",
+                            fontFamily: "var(--font-mono)",
+                          }}
+                        >
+                          Performance
+                        </div>
+                        <div className="hud-row" style={{ marginBottom: 4 }}>
+                          <span className="hud-label">FPS:</span>
+                          <span
+                            className="hud-val"
+                            style={{ color: "#34D399" }}
+                          >
+                            {fps}
+                          </span>
+                        </div>
+                        <div className="hud-row" style={{ marginBottom: 4 }}>
+                          <span className="hud-label">Latency:</span>
+                          <span
+                            className="hud-val"
+                            style={{ color: "#F59E0B" }}
+                          >
+                            {latency}ms
+                          </span>
+                        </div>
+                        <div className="hud-row">
+                          <span className="hud-label">Frames:</span>
+                          <span
+                            className="hud-val"
+                            style={{ color: "#94A3B8" }}
+                          >
+                            {frames.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Canvas footer */}
+                {streaming && (
+                  <div className="canvas-footer">
+                    <div className="env-tag">
+                      <div
+                        className="env-dot"
+                        style={{ background: currentBg.accent }}
+                      />
+                      <span>{currentBg.label}</span>
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: "var(--font-mono)",
+                        fontSize: 11,
+                        color: "var(--muted)",
+                      }}
+                    >
+                      {fmtTime(uptime)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Controls bar */}
+            <div className="controls-bar">
+              <div className="controls-left">
+                {!streaming ? (
+                  <button
+                    className="btn btn-primary"
+                    onClick={startStream}
+                    disabled={!connected}
+                    style={{ fontSize: 14, padding: "11px 28px" }}
+                  >
+                    <Ico name="play" size={16} /> Start Studio
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn-danger"
+                    onClick={stopStream}
+                    style={{ fontSize: 14, padding: "11px 28px" }}
+                  >
+                    <Ico name="stop" size={16} /> End Session
+                  </button>
+                )}
+
+                {!connected && !connecting && (
+                  <button
+                    className="btn btn-ghost"
+                    onClick={connect}
+                    style={{ gap: 8 }}
+                  >
+                    <Ico name="cloud" size={15} /> Connect Engine
+                  </button>
+                )}
+
+                {streaming && !recording && (
+                  <button
+                    className="btn btn-danger"
+                    onClick={startRec}
+                    style={{ padding: "11px 20px" }}
+                  >
+                    <div
+                      style={{
+                        width: 8,
+                        height: 8,
+                        background: "white",
+                        borderRadius: "50%",
+                        flexShrink: 0,
+                      }}
+                    />
+                    Record
+                  </button>
+                )}
+
+                {recording && (
+                  <>
+                    <button className="btn btn-ghost" onClick={stopRec}>
+                      <Ico name="stop" size={15} /> Stop Rec
+                    </button>
+                    <div className="rec-indicator">
+                      <div
+                        className="status-dot pulse"
+                        style={{ background: "#F43F5E" }}
+                      />
+                      {fmtRec(recTime)}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="controls-right">
+                <select
+                  className="quality-select"
+                  value={quality}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "4K" && plan === "free") {
+                      requirePro("4K streaming");
+                      return;
+                    }
+                    setQuality(v);
+                  }}
+                >
+                  <option value="4K">4K {plan === "free" ? "🔒" : ""}</option>
+                  <option value="HD">HD 1080p</option>
+                  <option value="SD">SD 720p</option>
+                </select>
+
+                {streaming && (
+                  <>
+                    <button
+                      className="btn btn-ghost"
+                      onClick={exportFrame}
+                      title="Export frame"
+                    >
+                      <Ico name="download" size={15} /> Export
+                    </button>
+                    <button
+                      className="btn-icon btn"
+                      onClick={() => {
+                        const cv = canvasRef.current;
+                        if (cv) {
+                          const ctx = cv.getContext("2d");
+                          ctx?.clearRect(0, 0, cv.width, cv.height);
+                        }
+                      }}
+                    >
+                      <Ico name="rotate" size={15} />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Session strip (when streaming) */}
+            {streaming && (
+              <div className="session-strip">
+                <div className="session-item">
+                  <div className="session-key">Uptime</div>
+                  <div className="session-val">{fmtTime(uptime)}</div>
+                </div>
+                <div className="session-item">
+                  <div className="session-key">Frames</div>
+                  <div className="session-val">{frames.toLocaleString()}</div>
+                </div>
+                <div className="session-item">
+                  <div className="session-key">FPS</div>
+                  <div className="session-val">{fps}</div>
+                </div>
+                <div className="session-item">
+                  <div className="session-key">Latency</div>
+                  <div className="session-val">{latency}ms</div>
+                </div>
+                <div className="session-item">
+                  <div className="session-key">Quality</div>
+                  <div className="session-val">{quality}</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right panel */}
+          <div className="right-panel">
+            {/* Environments + Settings tabs */}
+            <div className="panel-card">
+              <div className="panel-body">
+                <div className="tabs">
+                  <button
+                    className={`tab ${activeTab === "environments" ? "active" : ""}`}
+                    onClick={() => setActiveTab("environments")}
+                  >
+                    Environments
+                  </button>
+                  <button
+                    className={`tab ${activeTab === "settings" ? "active" : ""}`}
+                    onClick={() => setActiveTab("settings")}
+                  >
+                    Settings
+                  </button>
+                </div>
+
+                {activeTab === "environments" && (
+                  <>
+                    <div className="env-grid">
+                      {BACKGROUNDS.map((bg) => {
+                        const isLocked = bg.tag === "PRO" && plan === "free";
+                        const isActive = bgType === bg.id;
+                        return (
+                          <div
+                            key={bg.id}
+                            className={`env-card fade-in ${isActive ? "active" : ""} ${isLocked ? "locked" : ""}`}
+                            style={{
+                              borderColor: isActive ? bg.accent : "transparent",
+                              color: bg.accent,
+                            }}
+                            onClick={() => selectBg(bg)}
+                          >
+                            <div className="env-bg">
+                              <div
+                                className="env-gradient"
+                                style={{
+                                  "--c1": bg.color,
+                                  "--c2": bg.color + "AA",
+                                }}
+                              />
+                              <div
+                                style={{
+                                  position: "relative",
+                                  zIndex: 1,
+                                  opacity: isLocked ? 0.3 : 0.7,
+                                  fontSize: 24,
+                                }}
+                              >
+                                {bg.id === "blur"
+                                  ? "🎬"
+                                  : bg.id === "office"
+                                    ? "🏛"
+                                    : bg.id === "studio"
+                                      ? "📺"
+                                      : bg.id === "luxury"
+                                        ? "💎"
+                                        : bg.id === "nature"
+                                          ? "🌿"
+                                          : bg.id === "urban"
+                                            ? "🏙"
+                                            : bg.id === "cosmic"
+                                              ? "🌌"
+                                              : bg.id === "beach"
+                                                ? "🏝"
+                                                : bg.id === "gradient"
+                                                  ? "🎨"
+                                                  : bg.id === "abstract"
+                                                    ? "✦"
+                                                    : bg.id === "space"
+                                                      ? "🚀"
+                                                      : "📁"}
+                              </div>
+                            </div>
+                            <div className="env-info">
+                              <div className="env-label">{bg.label}</div>
+                            </div>
+                            <div
+                              className={`env-badge ${bg.tag === "FREE" ? "badge-free" : "badge-pro"}`}
+                            >
+                              {bg.tag}
+                            </div>
+                            {isLocked && (
+                              <div className="env-lock">
+                                <Ico
+                                  name="lock"
+                                  size={16}
+                                  style={{ color: "#F59E0B" }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      onChange={handleUpload}
+                    />
+                  </>
+                )}
+
+                {activeTab === "settings" && (
+                  <>
+                    <div className="section-label">Processing Quality</div>
+                    <div className="quality-btns">
+                      {["medium", "high", "ultra"].map((q) => {
+                        const locked = q === "ultra" && plan === "free";
+                        return (
+                          <button
+                            key={q}
+                            className={`q-btn ${processQuality === q ? "active" : ""}`}
+                            onClick={() => {
+                              if (locked) {
+                                requirePro("Ultra quality");
+                                return;
+                              }
+                              setProcessQuality(q);
+                            }}
+                          >
+                            {q === "ultra"
+                              ? "⚡ Ultra"
+                              : q === "high"
+                                ? "HD"
+                                : "SD"}
+                            {locked && <Ico name="lock" size={10} />}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="slider-row">
+                      <div className="slider-label">
+                        <span className="slider-name">Edge Smoothing</span>
+                        <span className="slider-val">{edgeSmooth}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={edgeSmooth}
+                        onChange={(e) => setEdgeSmooth(+e.target.value)}
+                      />
+                    </div>
+
+                    <div className="slider-row">
+                      <div className="slider-label">
+                        <span className="slider-name">Blur Intensity</span>
+                        <span className="slider-val">{blurAmount}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={30}
+                        value={blurAmount}
+                        onChange={(e) => setBlurAmount(+e.target.value)}
+                      />
+                    </div>
+
+                    <div className="divider" />
+
+                    <div className="section-label">Stream Resolution</div>
+                    <div className="quality-btns">
+                      {["SD", "HD", "4K"].map((q) => (
+                        <button
+                          key={q}
+                          className={`q-btn ${quality === q ? "active" : ""}`}
+                          onClick={() => {
+                            if (q === "4K" && plan === "free") {
+                              requirePro("4K");
+                              return;
+                            }
+                            setQuality(q);
+                          }}
+                        >
+                          {q}
+                          {q === "4K" && plan === "free" && (
+                            <Ico name="lock" size={10} />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="divider" />
+
+                    <button
+                      className="btn btn-ghost"
+                      style={{
+                        width: "100%",
+                        justifyContent: "center",
+                        fontSize: 12,
+                      }}
+                      onClick={() => {
+                        if (wsRef.current?.readyState === WebSocket.OPEN)
+                          wsRef.current.close();
+                        connect();
+                      }}
+                    >
+                      <Ico name="rotate" size={14} /> Reconnect Engine
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Performance */}
+            <div className="panel-card">
+              <div className="panel-head">
+                <div className="panel-title">
+                  <Ico name="chart" size={14} style={{ color: "#34D399" }} />
+                  Performance
+                </div>
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontFamily: "var(--font-mono)",
+                    color: connected ? "#34D399" : "var(--muted)",
+                  }}
+                >
+                  {connected ? "● OPTIMAL" : "● IDLE"}
+                </div>
+              </div>
+              <div className="panel-body" style={{ paddingBottom: 10 }}>
+                <div className="stats-grid">
+                  <div className="stat-card">
+                    <div className="stat-label">CPU</div>
+                    <div className="stat-val" style={{ color: "#818CF8" }}>
+                      {cpu.toFixed(0)}
+                      <span style={{ fontSize: 12 }}>%</span>
+                    </div>
+                    <div className="stat-bar">
+                      <div
+                        className="stat-fill"
+                        style={{
+                          width: `${cpu}%`,
+                          background:
+                            "linear-gradient(90deg, #4F46E5, #818CF8)",
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-label">Memory</div>
+                    <div className="stat-val" style={{ color: "#34D399" }}>
+                      {mem.toFixed(0)}
+                      <span style={{ fontSize: 12 }}>%</span>
+                    </div>
+                    <div className="stat-bar">
+                      <div
+                        className="stat-fill"
+                        style={{
+                          width: `${mem}%`,
+                          background:
+                            "linear-gradient(90deg, #059669, #34D399)",
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-label">Frame Rate</div>
+                    <div className="stat-val" style={{ color: "#F59E0B" }}>
+                      {fps}
+                      <span style={{ fontSize: 12 }}> fps</span>
+                    </div>
+                    <div className="stat-bar">
+                      <div
+                        className="stat-fill"
+                        style={{
+                          width: `${Math.min((fps / 60) * 100, 100)}%`,
+                          background:
+                            "linear-gradient(90deg, #D97706, #F59E0B)",
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-label">Latency</div>
+                    <div className="stat-val" style={{ color: "#38BDF8" }}>
+                      {latency}
+                      <span style={{ fontSize: 12 }}> ms</span>
+                    </div>
+                    <div className="stat-bar">
+                      <div
+                        className="stat-fill"
+                        style={{
+                          width: `${Math.min((latency / 200) * 100, 100)}%`,
+                          background:
+                            "linear-gradient(90deg, #0284C7, #38BDF8)",
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="server-card">
+                  <div className="server-row">
+                    <span className="server-key">Engine Version</span>
+                    <span className="server-val" style={{ color: "#818CF8" }}>
+                      v3.2.0
+                    </span>
+                  </div>
+                  <div className="server-row">
+                    <span className="server-key">Server Load</span>
+                    <span className="server-val" style={{ color: "#34D399" }}>
+                      {serverLoad.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="server-row">
+                    <span className="server-key">Session Uptime</span>
+                    <span className="server-val" style={{ color: "#94A3B8" }}>
+                      {fmtTime(uptime)}
+                    </span>
+                  </div>
+                  {reconnects > 0 && (
+                    <div className="server-row">
+                      <span className="server-key">Reconnects</span>
+                      <span className="server-val" style={{ color: "#F59E0B" }}>
+                        {reconnects}
+                      </span>
                     </div>
                   )}
                 </div>
-                
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={() => setAudioEnabled(!audioEnabled)}
-                    className={`p-3 rounded-xl transition-all duration-200 ${audioEnabled ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'bg-slate-700/50 text-slate-400 hover:bg-slate-600/50'}`}
-                  >
-                    {audioEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-                  </button>
-                  <button
-                    onClick={toggleFullscreen}
-                    className="p-3 rounded-xl bg-slate-700/50 text-slate-400 hover:bg-slate-600/50 transition-colors"
-                  >
-                    {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
-                  </button>
-                </div>
               </div>
+            </div>
 
-              <div className="relative flex-1 bg-gradient-to-br from-slate-950 to-slate-900 rounded-2xl overflow-hidden group shadow-inner">
-                <video
-                  ref={videoRef}
-                  className="absolute inset-0 w-full h-full object-cover opacity-0"
-                  autoPlay
-                  muted={!audioEnabled}
-                  playsInline
-                />
-
-                <canvas
-                  ref={canvasRef}
-                  className="w-full h-full object-cover transition-all duration-300 rounded-2xl"
-                />
-
-                {!streamState.isStreaming && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-950/95 to-slate-900/95 backdrop-blur-sm">
-                    <div className="text-center space-y-8 max-w-md">
-                      <div className="relative mx-auto">
-                        <div className="w-32 h-32 mx-auto bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-3xl flex items-center justify-center opacity-80 shadow-2xl">
-                          <Camera className="w-16 h-16 text-white" />
-                        </div>
-                        <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-2xl flex items-center justify-center shadow-xl">
-                          <Sparkles className="w-6 h-6 text-white" />
-                        </div>
-                      </div>
-                      <div>
-                        <h3 className="text-3xl font-bold mb-4">Studio Ready</h3>
-                        <p className="text-slate-400 text-lg leading-relaxed">
-                          {!connectionState.isConnected
-                            ? "Connect to the VirtualStage engine to begin professional video processing with cinema-grade quality"
-                            : "Click Start Studio to begin real-time virtual environment replacement"}
-                        </p>
-                      </div>
-                      {connectionState.isConnected && (
-                        <div className="p-6 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 rounded-2xl backdrop-blur-sm shadow-xl">
-                          <div className="flex items-center justify-center space-x-3 text-emerald-300">
-                            <div className="w-3 h-3 bg-emerald-400 rounded-full animate-pulse shadow-lg shadow-emerald-400/50"></div>
-                            <Crown className="w-5 h-5" />
-                            <span className="font-semibold">VirtualStage Engine Connected</span>
+            {/* Recordings */}
+            <div className="panel-card">
+              <div className="panel-head">
+                <div className="panel-title">
+                  <Ico name="video" size={14} style={{ color: "#F43F5E" }} />
+                  Recordings
+                </div>
+                <button
+                  className="btn-icon btn"
+                  style={{ width: 28, height: 28 }}
+                  onClick={async () => {
+                    try {
+                      const r = await fetch(
+                        "http://localhost:8000/recordings/list",
+                      );
+                      if (r.ok)
+                        setRecordings((await r.json()).recordings || []);
+                    } catch {}
+                  }}
+                >
+                  <Ico name="rotate" size={12} />
+                </button>
+              </div>
+              <div className="panel-body">
+                {recordings.length === 0 ? (
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: "24px 0",
+                      color: "var(--muted)",
+                      fontSize: 12,
+                    }}
+                  >
+                    <Ico
+                      name="video"
+                      size={28}
+                      style={{
+                        opacity: 0.3,
+                        marginBottom: 8,
+                        display: "block",
+                        margin: "0 auto 8px",
+                      }}
+                    />
+                    No recordings yet
+                  </div>
+                ) : (
+                  <div className="rec-list">
+                    {recordings.map((r, i) => (
+                      <div key={i} className="rec-item">
+                        <div>
+                          <div className="rec-name">
+                            {r.filename.replace(".mp4", "")}
+                          </div>
+                          <div className="rec-meta">
+                            {fmtSize(r.file_size)} ·{" "}
+                            {new Date(
+                              r.created_time * 1000,
+                            ).toLocaleDateString()}
                           </div>
                         </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {streamState.isStreaming && streamState.isProcessing && (
-                  <div className="absolute top-6 left-6 bg-slate-900/90 backdrop-blur-xl rounded-2xl px-4 py-2 flex items-center space-x-3 shadow-xl border border-slate-700/50">
-                    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse"></div>
-                    <span className="text-sm font-medium text-indigo-300">Processing</span>
-                  </div>
-                )}
-
-                {/* Performance HUD */}
-                {streamState.isStreaming && currentTier !== "free" && (
-                  <div className="absolute top-6 right-6 bg-slate-900/90 backdrop-blur-xl rounded-2xl p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <div className="text-xs text-slate-400 mb-2">Performance Metrics</div>
-                    <div className="space-y-1 text-xs">
-                      <div className="flex justify-between space-x-4">
-                        <span className="text-slate-400">FPS:</span>
-                        <span className="text-emerald-400 font-mono">{streamState.fps}</span>
-                      </div>
-                      <div className="flex justify-between space-x-4">
-                        <span className="text-slate-400">Latency:</span>
-                        <span className="text-purple-400 font-mono">{streamState.latency}ms</span>
-                      </div>
-                      <div className="flex justify-between space-x-4">
-                        <span className="text-slate-400">Quality:</span>
-                        <span className="text-blue-400 font-mono">{backgroundSettings.quality.toUpperCase()}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-center space-x-4 mt-8">
-                {!streamState.isStreaming ? (
-                  <button
-                    onClick={startCamera}
-                    disabled={!connectionState.isConnected}
-                    className="group relative px-12 py-4 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white rounded-2xl font-semibold text-lg shadow-2xl shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    <div className="relative flex items-center space-x-3">
-                      <Play className="w-6 h-6" />
-                      <span>Start Studio</span>
-                    </div>
-                  </button>
-                ) : (
-                  <button
-                    onClick={stopCamera}
-                    className="group relative px-12 py-4 bg-gradient-to-r from-rose-500 to-red-500 text-white rounded-2xl font-semibold text-lg shadow-2xl shadow-rose-500/25 hover:shadow-rose-500/40 transition-all duration-300 transform hover:scale-105"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-rose-600 to-red-600 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    <div className="relative flex items-center space-x-3">
-                      <Square className="w-6 h-6" />
-                      <span>End Session</span>
-                    </div>
-                  </button>
-                )}
-
-                {streamState.isStreaming && (
-                  <div className="flex items-center space-x-3">
-                    <button
-                      onClick={downloadFrame}
-                      className="p-4 bg-slate-700/50 hover:bg-slate-600/60 text-slate-300 hover:text-white rounded-2xl transition-all duration-200 shadow-lg"
-                      title="Export Frame"
-                    >
-                      <Download className="w-6 h-6" />
-                    </button>
-                    
-                    <button
-                      onClick={resetCanvas}
-                      className="p-4 bg-slate-700/50 hover:bg-slate-600/60 text-slate-300 hover:text-white rounded-2xl transition-all duration-200 shadow-lg"
-                      title="Reset Canvas"
-                    >
-                      <RotateCcw className="w-6 h-6" />
-                    </button>
-                  </div>
-                )}
-
-                {!connectionState.isConnected && !connectionState.isConnecting && (
-                  <button
-                    onClick={connectWebSocket}
-                    className="group relative px-12 py-4 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-2xl font-semibold text-lg shadow-2xl shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300 transform hover:scale-105"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    <div className="relative flex items-center space-x-3">
-                      <Cloud className="w-6 h-6" />
-                      <span>Connect Engine</span>
-                    </div>
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Enhanced Control Panel */}
-          <div className="col-span-4 space-y-6 max-h-full overflow-y-auto">
-            {/* Background Selection */}
-            <div className="bg-slate-900/60 backdrop-blur-2xl rounded-3xl p-6 border border-slate-700/30 shadow-xl">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold flex items-center space-x-3">
-                  <Layers className="w-6 h-6 text-purple-400" />
-                  <span>Virtual Environments</span>
-                </h3>
-                <div className="text-sm text-slate-400 bg-slate-800/60 px-3 py-1 rounded-full">
-                  {backgroundPresets.length} Presets
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3 mb-6">
-                {backgroundPresets.map((preset) => {
-                  const isLocked = preset.premium && currentTier === "free";
-                  return (
-                    <button
-                      key={preset.id}
-                      onClick={() => {
-                        if (isLocked) {
-                          setShowUpgrade(true);
-                          return;
-                        }
-                        if (preset.id === "custom") {
-                          handleCustomUpload();
-                        } else {
-                          setBackgroundSettings(prev => ({ ...prev, type: preset.id as any }));
-                          changeBackground(preset.id);
-                        }
-                      }}
-                      className={`group relative p-4 rounded-2xl transition-all duration-300 transform hover:scale-105 ${
-                        backgroundSettings.type === preset.id
-                          ? `bg-gradient-to-br ${preset.gradient} shadow-lg text-white border-2 border-white/20`
-                          : isLocked
-                          ? "bg-slate-800/30 text-slate-500 border border-slate-700/30 cursor-not-allowed"
-                          : "bg-slate-800/60 hover:bg-slate-700/60 text-slate-300 border border-slate-700/50"
-                      }`}
-                    >
-                      {isLocked && (
-                        <div className="absolute inset-0 bg-slate-900/80 rounded-2xl flex items-center justify-center">
-                          <Lock className="w-6 h-6 text-amber-400" />
+                        <div className="rec-actions">
+                          <button
+                            className="btn-icon btn"
+                            style={{ width: 28, height: 28, color: "#38BDF8" }}
+                            onClick={async () => {
+                              const res = await fetch(
+                                `http://localhost:8000/recordings/download/${r.filename}`,
+                              );
+                              const blob = await res.blob();
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement("a");
+                              a.href = url;
+                              a.download = r.filename;
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            }}
+                          >
+                            <Ico name="download" size={12} />
+                          </button>
                         </div>
-                      )}
-                      <div className="text-2xl mb-2">{preset.emoji}</div>
-                      <div className="text-xs font-semibold">{preset.name}</div>
-                      {backgroundSettings.type === preset.id && (
-                        <div className="absolute -top-1 -right-1 w-6 h-6 bg-emerald-400 rounded-full flex items-center justify-center">
-                          <div className="w-3 h-3 bg-white rounded-full"></div>
-                        </div>
-                      )}
-                      {preset.premium && (
-                        <div className="absolute -top-1 -left-1 w-6 h-6 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full flex items-center justify-center">
-                          <Crown className="w-3 h-3 text-white" />
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <input
-                type="file"
-                ref={fileInputRef}
-                accept="image/*"
-                onChange={handleBackgroundUpload}
-                className="hidden"
-              />
-
-              {/* Quality Settings */}
-              <div className="space-y-4">
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <label className="text-sm font-semibold text-slate-300">Processing Quality</label>
-                    <span className="text-xs text-indigo-400 bg-indigo-500/20 px-2 py-1 rounded-full">
-                      {backgroundSettings.quality.toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="flex space-x-2">
-                    {(["medium", "high", "ultra"] as const).map((quality) => {
-                      const isLocked = quality === "ultra" && currentTier === "free";
-                      return (
-                        <button
-                          key={quality}
-                          onClick={() => {
-                            if (isLocked) {
-                              setShowUpgrade(true);
-                              return;
-                            }
-                            setBackgroundSettings(prev => ({ ...prev, quality }));
-                          }}
-                          className={`relative flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-all duration-200 ${
-                            backgroundSettings.quality === quality
-                              ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/40"
-                              : isLocked
-                              ? "bg-slate-800/30 text-slate-500 border border-slate-700/30 cursor-not-allowed"
-                              : "bg-slate-800/60 text-slate-400 hover:bg-slate-700/60"
-                          }`}
-                        >
-                          {quality.charAt(0).toUpperCase() + quality.slice(1)}
-                          {isLocked && <Lock className="w-3 h-3 ml-1 inline" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <label className="text-sm font-semibold text-slate-300">Edge Smoothing</label>
-                    <span className="text-xs text-purple-400">{backgroundSettings.edgeSmoothing}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={backgroundSettings.edgeSmoothing}
-                    onChange={(e) => setBackgroundSettings(prev => ({ ...prev, edgeSmoothing: parseInt(e.target.value) }))}
-                    className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer slider"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Performance Dashboard */}
-            <div className="bg-slate-900/60 backdrop-blur-2xl rounded-3xl p-6 border border-slate-700/30 shadow-xl">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold flex items-center space-x-3">
-                  <BarChart3 className="w-6 h-6 text-emerald-400" />
-                  <span>Performance</span>
-                </h3>
-                <div className="text-xs bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full">
-                  {connectionState.isConnected ? "Optimal" : "Offline"}
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-slate-800/40 rounded-xl">
-                  <div className="flex items-center space-x-3">
-                    <Activity className="w-5 h-5 text-emerald-400" />
-                    <span className="text-sm font-medium">Frame Rate</span>
-                  </div>
-                  <span className="text-lg font-bold text-emerald-300">{streamState.fps} FPS</span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-slate-800/40 rounded-xl">
-                  <div className="flex items-center space-x-3">
-                    <Zap className="w-5 h-5 text-purple-400" />
-                    <span className="text-sm font-medium">Latency</span>
-                  </div>
-                  <span className="text-lg font-bold text-purple-300">{streamState.latency}ms</span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-slate-800/40 rounded-xl">
-                  <div className="flex items-center space-x-3">
-                    <Cpu className="w-5 h-5 text-amber-400" />
-                    <span className="text-sm font-medium">CPU Usage</span>
-                  </div>
-                  <span className="text-lg font-bold text-amber-300">{performanceMetrics.cpuUsage.toFixed(1)}%</span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-slate-800/40 rounded-xl">
-                  <div className="flex items-center space-x-3">
-                    <Monitor className="w-5 h-5 text-blue-400" />
-                    <span className="text-sm font-medium">Memory</span>
-                  </div>
-                  <span className="text-lg font-bold text-blue-300">{performanceMetrics.memoryUsage.toFixed(1)}%</span>
-                </div>
-
-                {streamState.isStreaming && (
-                  <div className="p-4 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 rounded-xl">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-semibold text-indigo-300">Session Stats</span>
-                      <Star className="w-4 h-4 text-yellow-400" />
-                    </div>
-                    <div className="space-y-1 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Uptime:</span>
-                        <span className="text-slate-300">{formatUptime(performanceMetrics.uptime)}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Frames:</span>
-                        <span className="text-slate-300">{sessionStats.processedFrames.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Quality:</span>
-                        <span className="text-slate-300">{streamState.quality}</span>
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 )}
               </div>
             </div>
 
-            {/* System Logs */}
-            <div className="bg-slate-900/60 backdrop-blur-2xl rounded-3xl p-6 border border-slate-700/30 shadow-xl">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold flex items-center space-x-3">
-                  <Shield className="w-5 h-5 text-cyan-400" />
-                  <span>System Logs</span>
-                </h3>
-                <div className="text-xs text-slate-400">{logs.length}/8</div>
+            {/* Activity log */}
+            <div className="panel-card">
+              <div className="panel-head">
+                <div className="panel-title">
+                  <Ico name="shield" size={14} style={{ color: "#06B6D4" }} />
+                  Activity Log
+                </div>
+                <div className="panel-count">{logs.length}</div>
               </div>
-
-              <div className="space-y-2 max-h-40 overflow-y-auto">
+              <div className="panel-body">
                 {logs.length === 0 ? (
-                  <div className="text-center py-8 text-slate-500">
-                    <Shield className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">System ready. No events logged.</p>
-                  </div>
+                  <div className="log-empty">No events logged yet</div>
                 ) : (
-                  logs.map((log, index) => (
-                    <div
-                      key={index}
-                      className="p-3 bg-slate-800/40 rounded-xl text-xs font-mono text-slate-300 border-l-2 border-cyan-500/30"
-                    >
-                      {log}
-                    </div>
-                  ))
+                  <div className="log-list">
+                    {[...logs].reverse().map((l, i) => (
+                      <div key={i} className={`log-item log-${l.type}`}>
+                        <span className="log-icon">{l.icon}</span>
+                        <span className="log-time">{l.time}</span>
+                        <span className="log-msg">{l.msg}</span>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
 
-            {/* Advanced Settings */}
-            <div className="bg-slate-900/60 backdrop-blur-2xl rounded-3xl p-6 border border-slate-700/30 shadow-xl">
-              <button
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="w-full flex items-center justify-between mb-4 p-3 bg-slate-800/40 hover:bg-slate-700/40 rounded-xl transition-colors"
-              >
-                <div className="flex items-center space-x-3">
-                  <Sliders className="w-5 h-5 text-orange-400" />
-                  <span className="font-semibold">Advanced Settings</span>
-                </div>
-                <div className={`transform transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>
-                  ▼
-                </div>
-              </button>
-
-              {showAdvanced && (
-                <div className="space-y-4 pt-4 border-t border-slate-700/50">
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-300 mb-2">Stream Quality</label>
-                    <select
-                      value={streamState.quality}
-                      onChange={(e) => {
-                        const newQuality = e.target.value as "4K" | "HD" | "SD";
-                        if (newQuality === "4K" && currentTier === "free") {
-                          setShowUpgrade(true);
-                          return;
-                        }
-                        setStreamState(prev => ({ ...prev, quality: newQuality }));
-                      }}
-                      className="w-full p-3 bg-slate-800/60 border border-slate-700/50 rounded-xl text-white focus:border-indigo-500/50 focus:outline-none"
-                    >
-                      <option value="4K">4K Ultra (3840×2160) {currentTier === "free" ? "🔒" : ""}</option>
-                      <option value="HD">HD Premium (1920×1080)</option>
-                      <option value="SD">SD Standard (1280×720)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-300 mb-2">Blur Amount</label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="30"
-                      value={backgroundSettings.blurAmount}
-                      onChange={(e) => setBackgroundSettings(prev => ({ ...prev, blurAmount: parseInt(e.target.value) }))}
-                      className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
-                    />
-                    <div className="text-xs text-slate-400 mt-1">{backgroundSettings.blurAmount}px blur</div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-300 mb-2">Background Color</label>
-                    <input
-                      type="color"
-                      value={backgroundSettings.solidColor}
-                      onChange={(e) => setBackgroundSettings(prev => ({ ...prev, solidColor: e.target.value }))}
-                      className="w-full h-12 bg-slate-800/60 border border-slate-700/50 rounded-xl cursor-pointer"
-                    />
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      if (wsRef.current?.readyState === WebSocket.OPEN) {
-                        wsRef.current.close();
-                      }
-                      connectWebSocket();
+            {/* Connection help */}
+            {!connected && !connecting && (
+              <div className="connect-cta">
+                <div className="connect-cta-text">
+                  <strong style={{ color: "var(--text)" }}>
+                    Backend not detected
+                  </strong>
+                  <br />
+                  Start your VirtualStage backend server at{" "}
+                  <span
+                    style={{
+                      color: "#818CF8",
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 11,
                     }}
-                    className="w-full p-3 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 text-indigo-300 rounded-xl hover:bg-gradient-to-r hover:from-indigo-500/30 hover:to-purple-500/30 transition-all duration-200"
                   >
-                    <div className="flex items-center justify-center space-x-2">
-                      <Wifi className="w-5 h-5" />
-                      <span>Reconnect Engine</span>
-                    </div>
-                  </button>
+                    localhost:8000
+                  </span>{" "}
+                  then connect.
                 </div>
-              )}
-            </div>
+                <button
+                  className="btn btn-primary"
+                  onClick={connect}
+                  style={{ alignSelf: "flex-start", fontSize: 13 }}
+                >
+                  <Ico name="cloud" size={15} /> Connect Engine
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Pricing Modal */}
-        {showPricing && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-            <div className="bg-slate-900/95 backdrop-blur-xl rounded-3xl p-8 max-w-6xl w-full border border-slate-700/50 shadow-2xl">
-              <div className="flex items-center justify-between mb-8">
-                <h2 className="text-3xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-                  Choose Your Plan
-                </h2>
+        {/* Pricing overlay */}
+        {showPlans && (
+          <div
+            className="overlay"
+            onClick={(e) => e.target === e.currentTarget && setShowPlans(false)}
+          >
+            <div className="modal slide-up">
+              <div className="modal-head">
+                <div>
+                  <div className="modal-title">Choose your plan</div>
+                  <div className="modal-sub">
+                    Professional virtual staging for every creator
+                  </div>
+                </div>
                 <button
-                  onClick={() => setShowPricing(false)}
-                  className="p-2 rounded-xl bg-slate-800/50 hover:bg-slate-700/50 transition-colors"
+                  className="btn-icon btn"
+                  onClick={() => setShowPlans(false)}
                 >
-                  ✕
+                  <Ico name="x" size={16} />
                 </button>
               </div>
-
-              <div className="grid grid-cols-3 gap-6">
-                {subscriptionTiers.map((tier) => (
+              <div className="plan-grid">
+                {PLANS.map((p) => (
                   <div
-                    key={tier.id}
-                    className={`relative p-6 rounded-2xl border-2 transition-all duration-300 ${
-                      tier.popular
-                        ? "border-purple-500 bg-purple-500/10 shadow-lg shadow-purple-500/20"
-                        : "border-slate-700 bg-slate-800/30"
-                    }`}
+                    key={p.id}
+                    className={`plan-card ${p.badge ? "popular" : ""}`}
                   >
-                    {tier.popular && (
-                      <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                        <div className="bg-gradient-to-r from-purple-500 to-pink-500 px-4 py-1 rounded-full text-sm font-semibold">
-                          Most Popular
-                        </div>
-                      </div>
-                    )}
-                    
-                    <div className="text-center mb-6">
-                      <h3 className="text-2xl font-bold mb-2">{tier.name}</h3>
-                      <div className="text-4xl font-bold mb-2">
-                      ₹{tier.price}
-                        <span className="text-lg text-slate-400">/mo</span>
+                    {p.badge && <div className="popular-ribbon">{p.badge}</div>}
+                    <div
+                      className={`plan-header ${!p.badge ? "no-ribbon" : ""}`}
+                    >
+                      <div className="plan-name">{p.name}</div>
+                      <div className="plan-desc">{p.desc}</div>
+                      <div className="plan-price">
+                        {p.price > 0 && (
+                          <span className="price-currency">₹</span>
+                        )}
+                        <span className="price-num">
+                          {p.price === 0 ? "Free" : p.price}
+                        </span>
+                        {p.price > 0 && <span className="price-per">/mo</span>}
                       </div>
                     </div>
-
-                    <ul className="space-y-3 mb-6">
-                      {tier.features.map((feature, idx) => (
-                        <li key={idx} className="flex items-center space-x-3">
-                          <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-                            ✓
+                    <div className="plan-features">
+                      {p.features.map((f, i) => (
+                        <div key={i} className="plan-feat">
+                          <div className="feat-check">
+                            <Ico name="check" size={9} />
                           </div>
-                          <span className="text-sm">{feature}</span>
-                        </li>
+                          {f}
+                        </div>
                       ))}
-                    </ul>
-
-                    <button
-                      onClick={() => {
-                        setCurrentTier(tier.id);
-                        setShowPricing(false);
-                        addLog(`Upgraded to ${tier.name} plan`, "success");
-                      }}
-                      className={`w-full py-3 rounded-xl font-semibold transition-all duration-200 ${
-                        currentTier === tier.id
-                          ? "bg-green-500/20 text-green-400 border border-green-500/40"
-                          : `bg-gradient-to-r ${tier.gradient} hover:scale-105 text-white shadow-lg`
-                      }`}
-                      disabled={currentTier === tier.id}
-                    >
-                      {currentTier === tier.id ? "Current Plan" : "Choose Plan"}
-                    </button>
+                    </div>
+                    <div className="plan-cta">
+                      <button
+                        className={`btn ${plan === p.id ? "btn-ghost" : p.id === "enterprise" ? "btn-amber" : p.badge ? "btn-primary" : "btn-ghost"}`}
+                        style={{ width: "100%", justifyContent: "center" }}
+                        disabled={plan === p.id}
+                        onClick={() => {
+                          setPlan(p.id);
+                          setShowPlans(false);
+                          log(`Upgraded to ${p.name}`, "success");
+                        }}
+                      >
+                        {plan === p.id ? "✓ Current Plan" : p.cta}
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -2398,145 +2543,65 @@ const Home: React.FC = () => {
           </div>
         )}
 
-        {/* Upgrade Prompt Modal */}
+        {/* Upgrade prompt */}
         {showUpgrade && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-            <div className="bg-slate-900/95 backdrop-blur-xl rounded-3xl p-8 max-w-md w-full border border-slate-700/50 shadow-2xl">
-              <div className="text-center space-y-6">
-                <div className="w-16 h-16 mx-auto bg-gradient-to-r from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center">
-                  <Crown className="w-8 h-8 text-white" />
+          <div
+            className="overlay"
+            onClick={(e) =>
+              e.target === e.currentTarget && setShowUpgrade(false)
+            }
+          >
+            <div className="modal upgrade-modal slide-up">
+              <div className="upgrade-body">
+                <div className="upgrade-icon">
+                  <Ico name="crown" size={32} />
                 </div>
-                
-                <div>
-                  <h3 className="text-2xl font-bold mb-2">Upgrade Required</h3>
-                  <p className="text-slate-400">
-                    This feature requires a Professional or Enterprise subscription to unlock premium capabilities.
-                  </p>
+                <div className="upgrade-title">Upgrade to Pro</div>
+                <div className="upgrade-sub">
+                  <strong style={{ color: "var(--text)" }}>
+                    {upgradeFeature}
+                  </strong>{" "}
+                  requires a Professional subscription.
                 </div>
-
-                <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-2xl p-6">
-                  <div className="flex items-center space-x-3 mb-4">
-                    <Lightning className="w-6 h-6 text-amber-400" />
-                    <span className="font-semibold text-amber-300">Pro Features Include:</span>
+                <div className="feature-list">
+                  <div className="feature-list-title">
+                    What you unlock with Pro
                   </div>
-                  <ul className="space-y-2 text-sm text-slate-300">
-                    <li>• 4K Ultra Resolution Processing</li>
-                    <li>• Premium AI Background Library</li>
-                    <li>• Advanced Quality Controls</li>
-                    <li>• Priority Processing Queue</li>
-                    <li>• Unlimited Session Time</li>
-                  </ul>
+                  {[
+                    "4K Ultra HD output",
+                    "All 12 virtual environments",
+                    "Recording & export",
+                    "Priority processing",
+                    "AI enhancement engine",
+                    "Custom backgrounds",
+                  ].map((f) => (
+                    <div key={f} className="feature-item">
+                      {f}
+                    </div>
+                  ))}
                 </div>
-
-                <div className="flex space-x-3">
+                <div className="btn-row">
                   <button
+                    className="btn btn-ghost"
                     onClick={() => setShowUpgrade(false)}
-                    className="flex-1 py-3 px-6 bg-slate-700/50 hover:bg-slate-600/50 rounded-xl font-semibold transition-colors"
                   >
-                    Cancel
+                    Maybe later
                   </button>
                   <button
+                    className="btn btn-primary"
                     onClick={() => {
                       setShowUpgrade(false);
-                      setShowPricing(true);
+                      setShowPlans(true);
                     }}
-                    className="flex-1 py-3 px-6 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 rounded-xl font-semibold transition-all duration-200 transform hover:scale-105"
                   >
-                    Upgrade Now
+                    <Ico name="sparkles" size={15} /> View Plans
                   </button>
                 </div>
               </div>
             </div>
           </div>
         )}
-
-        {/* Setup Instructions */}
-        {!connectionState.isConnected && !connectionState.isConnecting && (
-          <div className="">
-            Nothing
-          </div>
-        )}
-
-        {/* Footer */}
-        <div className="text-center mt-44 pb-6">
-          <div className="flex items-center justify-center space-x-8 text-sm text-slate-400 mb-6">
-            <div className="flex items-center space-x-2">
-              <Shield className="w-4 h-4 text-blue-400" />
-              <span>Enterprise Security</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Zap className="w-4 h-4 text-purple-400" />
-              <span>Real-time AI Processing</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Cloud className="w-4 h-4 text-green-400" />
-              <span>Scalable Architecture</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <TrendingUp className="w-4 h-4 text-amber-400" />
-              <span>Professional Grade</span>
-            </div>
-          </div>
-          
-          <div className="bg-slate-900/60 backdrop-blur-xl rounded-2xl p-6 mt-6 border border-slate-700/30 max-w-4xl mx-auto">
-            <h4 className="text-lg font-semibold mb-4 flex items-center justify-center space-x-2">
-              <Trophy className="w-5 h-5 text-yellow-500" />
-              <span>Professional Virtual Studio Platform</span>
-            </h4>
-            <p className="text-slate-400 mb-4">
-              Trusted by content creators, broadcasters, and enterprises worldwide for professional-grade virtual background processing.
-            </p>
-            <div className="flex items-center justify-center space-x-6 text-xs">
-              <span className="bg-slate-800/50 px-3 py-1 rounded-full">99.9% Uptime</span>
-              <span className="bg-slate-800/50 px-3 py-1 rounded-full">24/7 Support</span>
-              <span className="bg-slate-800/50 px-3 py-1 rounded-full">Enterprise Ready</span>
-              <span className="bg-slate-800/50 px-3 py-1 rounded-full">GDPR Compliant</span>
-            </div>
-          </div>
-        </div>
       </div>
-
-      <style jsx>{`
-        .slider::-webkit-slider-thumb {
-          appearance: none;
-          height: 20px;
-          width: 20px;
-          border-radius: 50%;
-          background: linear-gradient(45deg, #6366f1, #8b5cf6);
-          cursor: pointer;
-          box-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
-        }
-
-        .slider::-moz-range-thumb {
-          height: 20px;
-          width: 20px;
-          border-radius: 50%;
-          background: linear-gradient(45deg, #6366f1, #8b5cf6);
-          cursor: pointer;
-          border: none;
-          box-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
-        }
-
-        .scrollbar-thin::-webkit-scrollbar {
-          width: 6px;
-        }
-
-        .scrollbar-thin::-webkit-scrollbar-track {
-          background: rgba(51, 65, 85, 0.3);
-          border-radius: 3px;
-        }
-
-        .scrollbar-thin::-webkit-scrollbar-thumb {
-          background: rgba(100, 116, 139, 0.8);
-          border-radius: 3px;
-        }
-
-        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-          background: rgba(100, 116, 139, 1);
-        }
-      `}</style>
-    </div>
+    </>
   );
-};
-
-export default Home;
+}
